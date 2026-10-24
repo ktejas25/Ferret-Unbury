@@ -13,7 +13,11 @@ logger = logging.getLogger("file_archaeologist.scanner")
 EXCLUDED_DIRS = {
     ".git", ".svn", ".hg", "node_modules", "__pycache__", ".vscode",
     ".idea", "venv", ".env", "env", "bin", "obj", "$recycle.bin",
-    "system volume information", ".tmp"
+    "system volume information", ".tmp",
+    # Windows OS system roots and caches
+    "windows", "program files", "program files (x86)", "programdata",
+    "appdata", "recovery", "boot", "perflogs", "msocache", "config.msi",
+    "$windows.~bt", "$windows.~ws"
 }
 
 

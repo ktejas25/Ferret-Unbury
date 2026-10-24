@@ -23,19 +23,84 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def get_raw_connection() -> pymysql.Connection:
-    """Provides a raw PyMySQL connection with multi-statement support."""
-    return pymysql.connect(
-        host=settings.MYSQL_HOST,
-        port=settings.MYSQL_PORT,
-        user=settings.MYSQL_USER,
-        password=settings.MYSQL_PASSWORD,
-        database=settings.MYSQL_DATABASE,
-        charset="utf8mb4",
-        autocommit=True,
-        client_flag=pymysql.constants.CLIENT.MULTI_STATEMENTS,
-        cursorclass=pymysql.cursors.DictCursor
-    )
+import queue
+import re
+import threading
+
+class PooledConnectionWrapper:
+    """Wraps a PyMySQL connection so .close() returns it to the pool instead of closing the TCP socket."""
+    def __init__(self, raw_conn, pool):
+        self._raw_conn = raw_conn
+        self._pool = pool
+        self._closed = False
+
+    def close(self):
+        if not self._closed:
+            self._closed = True
+            self._pool.return_connection(self._raw_conn)
+
+    def __getattr__(self, item):
+        return getattr(self._raw_conn, item)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+
+class PyMySQLConnectionPool:
+    """Thread-safe connection pool for raw PyMySQL operations preventing WinError 10048."""
+    def __init__(self, max_connections: int = 25):
+        self._pool = queue.Queue(maxsize=max_connections)
+        self._max = max_connections
+
+    def _create(self) -> pymysql.Connection:
+        return pymysql.connect(
+            host=settings.MYSQL_HOST,
+            port=settings.MYSQL_PORT,
+            user=settings.MYSQL_USER,
+            password=settings.MYSQL_PASSWORD,
+            database=settings.MYSQL_DATABASE,
+            charset="utf8mb4",
+            autocommit=True,
+            client_flag=pymysql.constants.CLIENT.MULTI_STATEMENTS,
+            cursorclass=pymysql.cursors.DictCursor
+        )
+
+    def get_connection(self) -> PooledConnectionWrapper:
+        conn = None
+        while not conn:
+            try:
+                conn = self._pool.get_nowait()
+                try:
+                    conn.ping(reconnect=True)
+                except Exception:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                    conn = None
+            except queue.Empty:
+                conn = self._create()
+        return PooledConnectionWrapper(conn, self)
+
+    def return_connection(self, raw_conn: pymysql.Connection):
+        try:
+            self._pool.put_nowait(raw_conn)
+        except queue.Full:
+            try:
+                raw_conn.close()
+            except Exception:
+                pass
+
+
+_mysql_pool = PyMySQLConnectionPool(max_connections=25)
+
+
+def get_raw_connection() -> PooledConnectionWrapper:
+    """Provides a pooled raw PyMySQL connection with multi-statement support."""
+    return _mysql_pool.get_connection()
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -123,6 +188,13 @@ def init_database() -> None:
                         clean = part.replace("DELIMITER ;", "").strip()
                         if clean and not clean.startswith("--"):
                             if "CREATE PROCEDURE" in clean:
+                                m = re.search(r"CREATE\s+PROCEDURE\s+`?([a-zA-Z0-9_]+)`?", clean, re.IGNORECASE)
+                                if m:
+                                    proc_name = m.group(1)
+                                    try:
+                                        cur.execute(f"DROP PROCEDURE IF EXISTS `{proc_name}`;")
+                                    except Exception:
+                                        pass
                                 cur.execute(clean)
                             else:
                                 for stmt in clean.split(";"):

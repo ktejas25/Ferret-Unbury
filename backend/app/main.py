@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -88,18 +89,57 @@ app.include_router(history_router)
 app.include_router(system_router)
 
 # Serve built frontend static assets if available
-static_dir = Path(__file__).resolve().parent / "static"
-static_dir.mkdir(parents=True, exist_ok=True)
+def get_static_dir() -> Path:
+    candidates = []
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).parent
+        meipass = Path(getattr(sys, "_MEIPASS", exe_dir))
+        candidates.extend([
+            meipass / "app" / "static",
+            meipass / "static",
+            exe_dir / "_internal" / "app" / "static",
+            exe_dir / "app" / "static",
+            exe_dir / "static",
+        ])
+    candidates.extend([
+        Path(__file__).resolve().parent / "static",
+        Path(__file__).resolve().parent.parent / "app" / "static",
+        Path.cwd() / "app" / "static",
+        Path.cwd() / "backend" / "app" / "static",
+    ])
+    for c in candidates:
+        if (c / "index.html").exists():
+            return c
+    return Path(__file__).resolve().parent / "static"
 
-if (static_dir / "index.html").exists():
-    app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
+static_dir = get_static_dir()
+index_file = static_dir / "index.html"
+
+if index_file.exists():
+    assets_dir = static_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    @app.get("/")
+    async def serve_root():
+        return FileResponse(str(index_file))
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
         file_path = static_dir / full_path
         if file_path.exists() and file_path.is_file():
             return FileResponse(str(file_path))
-        return FileResponse(str(static_dir / "index.html"))
+        return FileResponse(str(index_file))
+else:
+    @app.get("/")
+    async def root_fallback():
+        return {
+            "application": "File Archaeologist API",
+            "version": "1.0.0",
+            "status": "online",
+            "docs": "/docs",
+            "health": "/api/health"
+        }
 if __name__ == "__main__":
     import uvicorn
     import webbrowser
