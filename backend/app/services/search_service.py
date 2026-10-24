@@ -30,43 +30,70 @@ class SearchService:
         items: List[SearchResultItem] = []
 
         # 1. Semantic Vector Search
+        semantic_records: List[Dict[str, Any]] = []
+        score_map: Dict[int, float] = {}
+
         try:
             q_emb = embedder.embed_query(query)
-            # Retrieve up to 3x top_k to allow for post-filtering
             candidate_vids, sim_scores = vector_index_manager.knn_query(q_emb, k=max(top_k * 3, 50))
             score_map = {vid: score for vid, score in zip(candidate_vids, sim_scores)}
 
             if candidate_vids:
-                # Fetch metadata from MySQL
-                records = metadata_store.get_files_by_vector_ids(candidate_vids)
-                # Filter and construct items
-                filtered = self._apply_filters(records, score_map, req)
-                # Sort by score descending
-                filtered.sort(key=lambda x: x.score, reverse=True)
-                items = filtered[:top_k]
+                semantic_records = metadata_store.get_files_by_vector_ids(candidate_vids)
         except Exception as e:
             logger.error(f"Semantic search error: {e}")
-            fallback_mode = True
 
-        # 2. Filename Fallback Search if semantic search yielded no matches or failed
-        if not items:
-            fallback_mode = True
-            fallback_records = metadata_store.search_fallback_filename(query, limit=top_k * 2)
-            # Fallback scores (1.0 for exact/prefix match, 0.7 for partial match)
-            score_map = {}
-            for r in fallback_records:
-                fname = r.get("filename", "").lower()
-                q_lower = query.lower()
-                if fname == q_lower:
-                    score_map[r["id"]] = 1.0
-                elif fname.startswith(q_lower):
-                    score_map[r["id"]] = 0.9
-                else:
-                    score_map[r["id"]] = 0.7
+        # 2. Filename Search (Hybrid Combination)
+        # Guarantees that exact, prefix, substring, or token filename matches always appear
+        filename_records = metadata_store.search_fallback_filename(query, limit=top_k * 2)
 
-            filtered = self._apply_filters(fallback_records, score_map, req)
-            filtered.sort(key=lambda x: (x.score, x.modified_at), reverse=True)
-            items = filtered[:top_k]
+        seen_file_ids = set()
+        merged_records: List[Dict[str, Any]] = []
+        q_lower = query.lower().strip()
+        q_tokens = [t.lower() for t in query.replace(".", " ").replace("_", " ").replace("-", " ").split() if len(t) >= 2]
+
+        # Prioritize and score filename matches
+        for r in filename_records:
+            fid = r["id"]
+            fname = r.get("filename", "").lower()
+            fname_no_ext = os.path.splitext(fname)[0]
+
+            if fname == q_lower or fname_no_ext == q_lower:
+                fn_score = 1.0
+            elif fname.startswith(q_lower) or fname_no_ext.startswith(q_lower):
+                fn_score = 0.95
+            elif q_lower in fname:
+                fn_score = 0.90
+            elif any(tok in fname for tok in q_tokens):
+                fn_score = 0.85
+            else:
+                fn_score = 0.75
+
+            vid = r.get("vector_id")
+            if vid and vid in score_map:
+                combined_score = max(fn_score, score_map[vid] * 0.4 + fn_score * 0.6)
+            else:
+                combined_score = fn_score
+
+            score_map[fid] = combined_score
+            if vid:
+                score_map[vid] = combined_score
+
+            seen_file_ids.add(fid)
+            merged_records.append(r)
+
+        # Add remaining semantic records
+        for r in semantic_records:
+            if r["id"] not in seen_file_ids:
+                seen_file_ids.add(r["id"])
+                merged_records.append(r)
+
+        # 3. Apply metadata filters
+        filtered = self._apply_filters(merged_records, score_map, req)
+        filtered.sort(key=lambda x: (x.score, x.modified_at), reverse=True)
+        items = filtered[:top_k]
+
+        fallback_mode = (len(semantic_records) == 0 and len(filename_records) > 0)
 
         took_ms = round((time.perf_counter() - start_time) * 1000, 2)
 

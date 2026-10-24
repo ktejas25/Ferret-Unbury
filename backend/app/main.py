@@ -100,13 +100,21 @@ if (static_dir / "index.html").exists():
         if file_path.exists() and file_path.is_file():
             return FileResponse(str(file_path))
         return FileResponse(str(static_dir / "index.html"))
-else:
-    @app.get("/")
-    async def root_fallback():
-        return {
-            "application": "File Archaeologist API",
-            "version": "1.0.0",
-            "status": "online",
-            "docs": "/docs",
-            "health": "/api/health"
-        }
+if __name__ == "__main__":
+    import uvicorn
+    import webbrowser
+    import threading
+    import time
+
+    url = f"http://{settings.API_HOST}:{settings.API_PORT}/"
+    print(f"Starting File Archaeologist on {url}...")
+
+    def open_browser():
+        time.sleep(1.2)
+        try:
+            webbrowser.open(url)
+        except Exception:
+            pass
+
+    threading.Thread(target=open_browser, daemon=True).start()
+    uvicorn.run(app, host=settings.API_HOST, port=settings.API_PORT)

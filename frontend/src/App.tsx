@@ -75,6 +75,9 @@ const MainApplication: React.FC = () => {
           <SearchPage
             initialQuery={pendingQuery}
             onClearInitialQuery={() => setPendingQuery(undefined)}
+            onNavigateToStatus={() => setActiveTab('status')}
+            foldersCount={folders.length}
+            totalIndexedFiles={indexStatus?.total_files ?? 0}
           />
         )}
 

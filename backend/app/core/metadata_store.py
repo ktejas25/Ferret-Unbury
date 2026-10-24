@@ -149,14 +149,43 @@ class MetadataStore:
             conn.close()
 
     def search_fallback_filename(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
-        """Invokes sp_search_fallback_filename with escaped query."""
-        safe_query = query.replace("%", "\\%").replace("_", "\\_")
+        """
+        Searches files by filename matching. Supports full query substring,
+        exact filename matching, and individual keyword tokens.
+        """
+        safe_query = query.replace("%", "\\%").replace("_", "\\_").strip()
         conn = get_raw_connection()
         try:
             with conn.cursor() as cur:
+                # 1. Try full query via stored procedure
                 cur.callproc("sp_search_fallback_filename", (safe_query, limit))
-                rows = cur.fetchall()
-                return list(rows) if rows else []
+                rows = list(cur.fetchall() or [])
+                seen_ids = {r["id"] for r in rows}
+
+                # 2. Also search for significant keyword tokens (e.g. 'aadhar' in 'aadhar image from june')
+                tokens = [t.strip() for t in query.replace("_", " ").replace("-", " ").split() if len(t.strip()) >= 2]
+                for tok in tokens[:5]:
+                    if len(rows) >= limit:
+                        break
+                    safe_tok = tok.replace("%", "\\%").replace("_", "\\_")
+                    sql = """
+                    SELECT id, full_path, filename, extension, size_bytes,
+                           modified_at, content_preview
+                    FROM files
+                    WHERE is_deleted = 0
+                      AND extraction_status <> 'failed'
+                      AND filename LIKE %s
+                    ORDER BY modified_at DESC
+                    LIMIT %s;
+                    """
+                    pattern = f"%{safe_tok}%"
+                    cur.execute(sql, (pattern, limit - len(rows)))
+                    for mr in cur.fetchall() or []:
+                        if mr["id"] not in seen_ids:
+                            seen_ids.add(mr["id"])
+                            rows.append(mr)
+
+                return rows
         except Exception as e:
             logger.error(f"Error in search_fallback_filename: {e}")
             return []

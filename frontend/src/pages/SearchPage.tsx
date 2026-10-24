@@ -9,11 +9,17 @@ import { SearchResultItem, SearchResponse } from '../types';
 interface SearchPageProps {
   initialQuery?: string;
   onClearInitialQuery?: () => void;
+  onNavigateToStatus?: () => void;
+  foldersCount?: number;
+  totalIndexedFiles?: number;
 }
 
 export const SearchPage: React.FC<SearchPageProps> = ({
   initialQuery,
   onClearInitialQuery,
+  onNavigateToStatus,
+  foldersCount = 0,
+  totalIndexedFiles = 0,
 }) => {
   const [query, setQuery] = useState(initialQuery || '');
   const [fileTypeFilter, setFileTypeFilter] = useState<string>('all');
@@ -167,6 +173,31 @@ export const SearchPage: React.FC<SearchPageProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* Alert if no folders are configured yet */}
+      {foldersCount === 0 && (
+        <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-200">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl flex-shrink-0">
+              <Folder className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-100 text-sm">No folders are currently being monitored</p>
+              <p className="text-slate-400 mt-0.5">
+                File Archaeologist only indexes folders you explicitly select. Add a folder (e.g. Documents, Pictures) to find your files.
+              </p>
+            </div>
+          </div>
+          {onNavigateToStatus && (
+            <button
+              onClick={onNavigateToStatus}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-xl text-xs flex-shrink-0 transition-colors shadow-sm"
+            >
+              Add Monitored Folder →
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Central Spotlight Search Field */}
       <div className="relative mb-6">
         <form onSubmit={handleSearchSubmit} className="relative group">
