@@ -36,6 +36,31 @@ export default {
       const db = new DatabaseManager(env.DB);
 
       try {
+        // --- 0. ROUTE DIRECTORY ---
+        if ((url.pathname === '/api' || url.pathname === '/api/') && request.method === 'GET') {
+          return jsonResponse({
+            application: 'File Archaeologist Edge API',
+            version: '1.0.0',
+            status: 'online',
+            environment: env.ENVIRONMENT || 'production',
+            routes: [
+              { path: '/api/health', method: 'GET', description: 'System health and edge status' },
+              { path: '/api/settings', methods: ['GET', 'PUT'], description: 'Application configuration' },
+              { path: '/api/search', method: 'POST', description: 'Hybrid semantic and keyword search' },
+              { path: '/api/search/suggest', method: 'GET', description: 'Query autocomplete suggestions' },
+              { path: '/api/search/open', method: 'POST', description: 'Document preview and verification' },
+              { path: '/api/index/status', method: 'GET', description: 'Index statistics and queue status' },
+              { path: '/api/index/folders', methods: ['GET', 'POST'], description: 'List or add monitored folders' },
+              { path: '/api/index/folders/:id', method: 'DELETE', description: 'Remove monitored folder' },
+              { path: '/api/index/rebuild', method: 'POST', description: 'Rebuild index state' },
+              { path: '/api/index/pause', method: 'POST', description: 'Pause indexing worker' },
+              { path: '/api/index/resume', method: 'POST', description: 'Resume indexing worker' },
+              { path: '/api/history', methods: ['GET', 'DELETE'], description: 'Search history entries' },
+              { path: '/api/history/failed', method: 'GET', description: 'Zero-result query insights' },
+            ],
+          });
+        }
+
         // --- 1. SYSTEM HEALTH & SETTINGS ---
         if (url.pathname === '/api/health' && request.method === 'GET') {
           const dbOk = await db.checkHealth();

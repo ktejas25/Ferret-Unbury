@@ -6,6 +6,7 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  "workers_dev": true,
   "assets": {
     "directory": "./backend/app/static",
     "binding": "ASSETS"

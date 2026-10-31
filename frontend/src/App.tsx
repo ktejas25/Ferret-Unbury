@@ -17,9 +17,32 @@ const queryClient = new QueryClient({
 });
 
 const MainApplication: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'search' | 'status' | 'history'>('search');
+  const getTabFromPath = (): 'search' | 'status' | 'history' => {
+    const path = window.location.pathname.toLowerCase();
+    if (path.startsWith('/status')) return 'status';
+    if (path.startsWith('/history')) return 'history';
+    return 'search';
+  };
+
+  const [activeTab, setActiveTabState] = useState<'search' | 'status' | 'history'>(getTabFromPath);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [pendingQuery, setPendingQuery] = useState<string | undefined>(undefined);
+
+  const setActiveTab = (tab: 'search' | 'status' | 'history') => {
+    setActiveTabState(tab);
+    const targetPath = tab === 'search' ? '/' : `/${tab}`;
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ tab }, '', targetPath);
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setActiveTabState(getTabFromPath());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Poll system health
   const { data: health } = useQuery({
