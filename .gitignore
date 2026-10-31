@@ -41,8 +41,7 @@ node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/build/
-backend/app/static/*
-!backend/app/static/.gitkeep
+# Built SPA static bundle tracked for Cloudflare edge deployment
 .wrangler/
 
 # OS / Editor
