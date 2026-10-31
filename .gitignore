@@ -43,6 +43,7 @@ frontend/dist/
 frontend/build/
 backend/app/static/*
 !backend/app/static/.gitkeep
+.wrangler/
 
 # OS / Editor
 .DS_Store
