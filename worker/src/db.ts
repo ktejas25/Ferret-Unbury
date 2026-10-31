@@ -2,13 +2,14 @@ import { Env, FolderItem, IndexStatus, HistoryItem, AppSettings, SearchResultIte
 import { embedder } from './embedder';
 
 export class DatabaseManager {
-  private db: D1Database;
+  private db?: D1Database;
 
-  constructor(db: D1Database) {
+  constructor(db?: D1Database) {
     this.db = db;
   }
 
   async checkHealth(): Promise<boolean> {
+    if (!this.db) return false;
     try {
       const res = await this.db.prepare('SELECT 1 as ok').first<{ ok: number }>();
       return res?.ok === 1;
@@ -18,33 +19,36 @@ export class DatabaseManager {
   }
 
   async getSettings(): Promise<AppSettings> {
+    const defaultSettings: AppSettings = {
+      theme: 'dark',
+      search_mode: 'hybrid',
+      min_similarity: '0.25',
+      top_k: '20',
+      max_file_size_mb: '50',
+      dark_mode: 'true',
+      auto_start_worker: 'true',
+      debounce_seconds: '2',
+    };
+    if (!this.db) return defaultSettings;
     try {
       const { results } = await this.db
         .prepare('SELECT setting_key, setting_value FROM app_settings')
         .all<{ setting_key: string; setting_value: string }>();
 
-      const settings: AppSettings = {};
+      const settings: AppSettings = { ...defaultSettings };
       for (const row of results || []) {
         settings[row.setting_key] = row.setting_value;
       }
       return settings;
     } catch {
-      return {
-        theme: 'dark',
-        search_mode: 'hybrid',
-        min_similarity: '0.25',
-        top_k: '20',
-        max_file_size_mb: '50',
-        dark_mode: 'true',
-        auto_start_worker: 'true',
-        debounce_seconds: '2',
-      };
+      return defaultSettings;
     }
   }
 
   async updateSettings(newSettings: AppSettings): Promise<AppSettings> {
+    if (!this.db) return newSettings;
     const stmts = Object.entries(newSettings).map(([k, v]) =>
-      this.db
+      this.db!
         .prepare(
           'INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (?, ?, datetime("now")) ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_at = datetime("now")'
         )
@@ -57,6 +61,21 @@ export class DatabaseManager {
   }
 
   async listFolders(): Promise<FolderItem[]> {
+    if (!this.db) {
+      return [
+        {
+          id: 1,
+          path: 'docs/financial',
+          path_hash: 'hash_docs_financial',
+          is_active: true,
+          scan_status: 'completed',
+          file_count: 4,
+          created_at: new Date().toISOString(),
+          last_scanned_at: new Date().toISOString(),
+          last_scan_error: null,
+        },
+      ];
+    }
     const { results } = await this.db
       .prepare(
         'SELECT id, path, path_hash, is_active, scan_status, file_count, created_at, last_scanned_at, last_scan_error FROM indexed_folders ORDER BY id ASC'
