@@ -10,13 +10,15 @@
     "directory": "./backend/app/static",
     "binding": "ASSETS"
   },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "file_archaeologist_db",
-      "database_id": "file-archaeologist-d1"
-    }
-  ],
+  // To attach Cloudflare D1, create a database in Cloudflare Dashboard -> Storage & Databases -> D1,
+  // and paste its real UUID below:
+  // "d1_databases": [
+  //   {
+  //     "binding": "DB",
+  //     "database_name": "file_archaeologist_db",
+  //     "database_id": "<REAL-D1-DATABASE-UUID>"
+  //   }
+  // ],
   "vars": {
     "ENVIRONMENT": "production"
   }
