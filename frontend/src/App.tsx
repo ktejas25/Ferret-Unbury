@@ -6,6 +6,7 @@ import { StatusPage } from './pages/StatusPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { SettingsModal } from './components/SettingsModal';
 import { api } from './api/client';
+import { ShieldCheck, Database, Cpu, Lock, Sparkles } from 'lucide-react';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,7 +91,10 @@ const MainApplication: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
+    <div className="relative min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200 overflow-x-hidden">
+      {/* Subtle Ambient Glow Effect */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[360px] bg-gradient-to-b from-indigo-500/10 via-violet-500/5 to-transparent blur-3xl pointer-events-none -z-10" />
+
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
@@ -139,8 +143,31 @@ const MainApplication: React.FC = () => {
       />
 
       {/* Local-First Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 py-4 px-6 text-center text-xs text-slate-500 font-mono">
-        <p>File Archaeologist • 100% Local-First & Private • MySQL 8 & Vector ANN • Port 8420</p>
+      <footer className="border-t border-slate-900 bg-slate-950/90 py-5 px-6 text-center text-xs text-slate-500 font-mono">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center space-x-2 text-slate-400">
+            <span className="font-semibold text-slate-300">File Archaeologist</span>
+            <span>•</span>
+            <span className="text-[11px]">v1.0 Pro</span>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-4 text-[11px] text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>100% Local-First & Private</span>
+            </span>
+            <span className="hidden md:inline">•</span>
+            <span className="flex items-center gap-1.5">
+              <Database className="w-3.5 h-3.5 text-indigo-400" />
+              <span>MySQL 8 & Vector ANN</span>
+            </span>
+            <span className="hidden md:inline">•</span>
+            <span className="flex items-center gap-1.5">
+              <Cpu className="w-3.5 h-3.5 text-violet-400" />
+              <span>On-Device Embeddings</span>
+            </span>
+          </div>
+        </div>
       </footer>
     </div>
   );
