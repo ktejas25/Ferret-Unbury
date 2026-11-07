@@ -70,6 +70,7 @@ class PyMySQLConnectionPool:
 
     def get_connection(self) -> PooledConnectionWrapper:
         conn = None
+        attempts = 0
         while not conn:
             try:
                 conn = self._pool.get_nowait()
@@ -82,7 +83,15 @@ class PyMySQLConnectionPool:
                         pass
                     conn = None
             except queue.Empty:
-                conn = self._create()
+                try:
+                    conn = self._create()
+                except Exception as e:
+                    attempts += 1
+                    if attempts >= 3:
+                        logger.error(f"Cannot establish MySQL connection after {attempts} attempts: {e}")
+                        raise
+                    import time
+                    time.sleep(0.4)
         return PooledConnectionWrapper(conn, self)
 
     def return_connection(self, raw_conn: pymysql.Connection):

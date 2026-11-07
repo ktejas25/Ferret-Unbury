@@ -63,14 +63,16 @@ export const StatusPage: React.FC<StatusPageProps> = ({
     }
   };
 
+  const isWorkerPaused = Boolean(status?.is_paused);
+
   const handleToggleWorkerPause = async () => {
     try {
-      if (status?.is_indexing) {
-        await api.pauseWorker();
-        setActionMessage('Worker paused');
-      } else {
+      if (isWorkerPaused) {
         await api.resumeWorker();
         setActionMessage('Worker resumed');
+      } else {
+        await api.pauseWorker();
+        setActionMessage('Worker paused');
       }
       setTimeout(() => setActionMessage(null), 3000);
       refetchStatus();
@@ -159,6 +161,30 @@ export const StatusPage: React.FC<StatusPageProps> = ({
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Worker State Pill */}
+          <div
+            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-medium border flex items-center gap-1.5 ${
+              isWorkerPaused
+                ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                : status?.is_indexing
+                ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isWorkerPaused
+                  ? 'bg-amber-500'
+                  : status?.is_indexing
+                  ? 'bg-indigo-500 animate-spin'
+                  : 'bg-emerald-500'
+              }`}
+            />
+            <span>
+              Worker: {isWorkerPaused ? 'Paused' : status?.is_indexing ? 'Indexing' : 'Idle'}
+            </span>
+          </div>
+
           <button
             onClick={() => {
               refetchStatus();
@@ -173,13 +199,13 @@ export const StatusPage: React.FC<StatusPageProps> = ({
           <button
             onClick={handleToggleWorkerPause}
             className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-colors ${
-              status?.is_indexing
-                ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30'
-                : 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30'
+              isWorkerPaused
+                ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30'
+                : 'bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30'
             }`}
           >
-            {status?.is_indexing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-            <span>{status?.is_indexing ? 'Pause Worker' : 'Resume Worker'}</span>
+            {isWorkerPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+            <span>{isWorkerPaused ? 'Resume Worker' : 'Pause Worker'}</span>
           </button>
         </div>
       </div>

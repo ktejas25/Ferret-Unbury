@@ -19,17 +19,26 @@ class ImageExtractor(BaseExtractor):
         if not settings.OCR_ENABLED:
             return ExtractionResult(
                 text="", preview="", is_skipped=True,
-                skip_reason="OCR is disabled in application settings"
+                skip_reason="OCR is disabled in application settings",
+                extractor="image_ocr",
             )
 
         try:
             import pytesseract
+        except ImportError:
+            return ExtractionResult(
+                text="", preview="", is_skipped=True,
+                skip_reason="pytesseract Python package is not installed",
+                extractor="image_ocr",
+            )
+
+        try:
             if settings.TESSERACT_CMD:
                 pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
 
             image = Image.open(str(file_path))
 
-            # Basic preprocessing: convert palette/RGBA to RGB/Grayscale
+            # Basic preprocessing: convert palette/RGBA to RGB
             if image.mode in ("RGBA", "P"):
                 image = image.convert("RGB")
 
@@ -39,18 +48,21 @@ class ImageExtractor(BaseExtractor):
             if not cleaned or len(cleaned.strip()) < 5:
                 return ExtractionResult(
                     text="", preview="", is_skipped=True,
-                    skip_reason="Image processed but no readable text discovered via OCR"
+                    skip_reason="Image processed but no readable text discovered via OCR",
+                    extractor="image_ocr",
                 )
 
             preview = cleaned[:500]
-            return ExtractionResult(text=cleaned, preview=preview)
+            return ExtractionResult(text=cleaned, preview=preview, extractor="image_ocr")
 
-        except pytesseract.TesseractNotFoundError:
+        except getattr(pytesseract, "TesseractNotFoundError", Exception):
             return ExtractionResult(
                 text="", preview="", is_skipped=True,
-                skip_reason="Tesseract OCR binary is not installed on system PATH"
+                skip_reason="Tesseract OCR binary is not installed on system PATH",
+                extractor="image_ocr",
             )
         except Exception as e:
             return ExtractionResult(
-                text="", preview="", error=f"Image OCR failure: {str(e)[:200]}"
+                text="", preview="", error=f"Image OCR failure: {str(e)[:200]}",
+                extractor="image_ocr",
             )

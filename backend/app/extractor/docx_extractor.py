@@ -7,10 +7,19 @@ logger = logging.getLogger("file_archaeologist.docx_extractor")
 
 class DocxExtractor(BaseExtractor):
     """
-    Extracts text paragraphs and table cells from Microsoft Word (.docx) documents.
+    Extracts text paragraphs and table cells from Microsoft Word (.docx) Open XML packages.
     """
 
     def extract(self, file_path: Path) -> ExtractionResult:
+        if file_path.suffix.lower() == ".doc":
+            return ExtractionResult(
+                text="",
+                preview="",
+                is_skipped=True,
+                skip_reason="DocxExtractor only handles .docx XML packages, not legacy binary .doc",
+                extractor="docx",
+            )
+
         try:
             import docx
             doc = docx.Document(str(file_path))
@@ -32,13 +41,15 @@ class DocxExtractor(BaseExtractor):
             if not cleaned or len(cleaned.strip()) < 10:
                 return ExtractionResult(
                     text="", preview="", is_skipped=True,
-                    skip_reason="DOCX document contains no text"
+                    skip_reason="DOCX document contains no text",
+                    extractor="docx",
                 )
 
             preview = cleaned[:500]
-            return ExtractionResult(text=cleaned, preview=preview)
+            return ExtractionResult(text=cleaned, preview=preview, extractor="docx")
 
         except Exception as e:
             return ExtractionResult(
-                text="", preview="", error=f"Malformed or unreadable DOCX: {str(e)[:200]}"
+                text="", preview="", error=f"Malformed or unreadable DOCX: {str(e)[:200]}",
+                extractor="docx",
             )

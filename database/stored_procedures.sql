@@ -47,8 +47,13 @@ DROP PROCEDURE IF EXISTS sp_fetch_pending_files;
 DELIMITER //
 CREATE PROCEDURE sp_fetch_pending_files(IN p_limit INT UNSIGNED)
 BEGIN
-    DROP TEMPORARY TABLE IF EXISTS tmp_claimed_ids;
-    CREATE TEMPORARY TABLE tmp_claimed_ids (id BIGINT UNSIGNED PRIMARY KEY);
+    START TRANSACTION;
+
+    CREATE TEMPORARY TABLE IF NOT EXISTS tmp_claimed_ids (
+        id BIGINT UNSIGNED PRIMARY KEY
+    ) ENGINE=MEMORY;
+
+    TRUNCATE TABLE tmp_claimed_ids;
 
     INSERT INTO tmp_claimed_ids (id)
     SELECT id FROM files
@@ -61,12 +66,13 @@ BEGIN
     JOIN tmp_claimed_ids t ON f.id = t.id
     SET f.extraction_status = 'processing';
 
-    SELECT f.id, f.folder_id, f.full_path, f.filename, f.extension,
+    SELECT f.id, f.folder_id, f.path_hash, f.full_path, f.filename, f.extension,
            f.size_bytes, f.modified_at, f.retry_count, f.vector_id
     FROM files f
     JOIN tmp_claimed_ids t ON f.id = t.id;
 
-    DROP TEMPORARY TABLE IF EXISTS tmp_claimed_ids;
+    TRUNCATE TABLE tmp_claimed_ids;
+    COMMIT;
 END//
 DELIMITER ;
 

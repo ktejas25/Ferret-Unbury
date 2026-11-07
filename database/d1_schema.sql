@@ -1,118 +1,244 @@
 -- =====================================================================
--- FILE ARCHAEOLOGIST - CLOUDFLARE D1 (SQLITE) CANONICAL SCHEMA & SEED
+-- FILE ARCHAEOLOGIST - CLOUDFLARE D1 (SQLITE) CANONICAL MULTI-TENANT SCHEMA
 -- =====================================================================
 
--- 1. Monitored folders table
-CREATE TABLE IF NOT EXISTS indexed_folders (
+-- 1. Users and Workspaces (Cloud Multi-Tenancy & Authorization)
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS workspaces (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_workspaces_owner ON workspaces(owner_id);
+
+CREATE TABLE IF NOT EXISTS workspace_members (
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'member', -- owner, admin, member, viewer
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (workspace_id, user_id)
+);
+
+-- 2. Monitored Sources / Folders
+CREATE TABLE IF NOT EXISTS monitored_sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    path TEXT NOT NULL,
-    path_hash TEXT NOT NULL UNIQUE,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    source_type TEXT NOT NULL DEFAULT 'upload', -- upload, r2_prefix, s3, sync
+    path_or_prefix TEXT NOT NULL,
+    path_hash TEXT NOT NULL,
     is_active INTEGER NOT NULL DEFAULT 1,
-    scan_status TEXT NOT NULL DEFAULT 'completed',
+    scan_status TEXT NOT NULL DEFAULT 'completed', -- pending, running, completed, partial, failed, cancelled
     file_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    last_scanned_at TEXT DEFAULT (datetime('now')),
-    last_scan_error TEXT
+    last_scanned_at TEXT,
+    last_scan_error TEXT,
+    UNIQUE(workspace_id, path_hash)
 );
-CREATE INDEX IF NOT EXISTS idx_folder_active ON indexed_folders (is_active);
+CREATE INDEX IF NOT EXISTS idx_sources_ws_active ON monitored_sources(workspace_id, is_active);
 
--- 2. Files metadata table
+-- Legacy compatibility view for indexed_folders
+CREATE VIEW IF NOT EXISTS indexed_folders AS
+SELECT id, path_or_prefix AS path, path_hash, is_active, scan_status, file_count, created_at, last_scanned_at, last_scan_error
+FROM monitored_sources;
+
+-- 3. Files Metadata (Cloud Stored in R2)
 CREATE TABLE IF NOT EXISTS files (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    folder_id INTEGER NOT NULL REFERENCES indexed_folders(id) ON DELETE CASCADE,
-    path_hash TEXT NOT NULL UNIQUE,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    folder_id INTEGER REFERENCES monitored_sources(id) ON DELETE CASCADE,
+    path_hash TEXT NOT NULL,
     full_path TEXT NOT NULL,
     filename TEXT NOT NULL,
     extension TEXT NOT NULL DEFAULT '',
     size_bytes INTEGER NOT NULL DEFAULT 0,
-    modified_at TEXT NOT NULL,
-    discovered_at TEXT NOT NULL DEFAULT (datetime('now')),
-    indexed_at TEXT DEFAULT (datetime('now')),
-    content_hash TEXT,
-    vector_id INTEGER,
+    storage_key TEXT, -- R2 object key
+    content_hash TEXT, -- SHA-256 content checksum
+    vector_id TEXT, -- Vectorize index vector ID
     content_preview TEXT,
     vector_json TEXT,
-    extraction_status TEXT NOT NULL DEFAULT 'done',
+    extraction_status TEXT NOT NULL DEFAULT 'pending', -- pending, processing, done, skipped, failed
     retry_count INTEGER NOT NULL DEFAULT 0,
     is_deleted INTEGER NOT NULL DEFAULT 0,
     deleted_at TEXT,
-    error_message TEXT
+    error_message TEXT,
+    modified_at TEXT NOT NULL DEFAULT (datetime('now')),
+    discovered_at TEXT NOT NULL DEFAULT (datetime('now')),
+    indexed_at TEXT,
+    UNIQUE(workspace_id, path_hash)
 );
-CREATE INDEX IF NOT EXISTS idx_files_folder_status ON files (folder_id, extraction_status, is_deleted);
-CREATE INDEX IF NOT EXISTS idx_files_extension ON files (extension);
-CREATE INDEX IF NOT EXISTS idx_files_modified ON files (modified_at);
-CREATE INDEX IF NOT EXISTS idx_files_deleted ON files (is_deleted, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_files_ws_status ON files(workspace_id, extraction_status, is_deleted);
+CREATE INDEX IF NOT EXISTS idx_files_extension ON files(extension);
+CREATE INDEX IF NOT EXISTS idx_files_modified ON files(modified_at);
+CREATE INDEX IF NOT EXISTS idx_files_storage ON files(storage_key);
 
--- 3. Search history table
+-- 4. File Versions & Chunks
+CREATE TABLE IF NOT EXISTS file_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    version_number INTEGER NOT NULL,
+    storage_key TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS file_chunks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    chunk_index INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    vector_id TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_chunks_file ON file_chunks(file_id);
+
+-- 5. Indexing Jobs (Cloud Queue Tracking)
+CREATE TABLE IF NOT EXISTS indexing_jobs (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'queued', -- queued, processing, completed, failed
+    stage TEXT NOT NULL DEFAULT 'upload', -- upload, extraction, embedding, indexing
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    error_type TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON indexing_jobs(workspace_id, status);
+
+-- 6. Search History and Insights
 CREATE TABLE IF NOT EXISTS search_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id TEXT NOT NULL DEFAULT 'default_workspace',
     query_text TEXT NOT NULL,
     result_count INTEGER NOT NULL DEFAULT 0,
     searched_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_searched_at ON search_history (searched_at);
+CREATE INDEX IF NOT EXISTS idx_search_history_ws ON search_history(workspace_id, searched_at);
 
--- 4. Application settings table
+CREATE TABLE IF NOT EXISTS search_insights (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id TEXT NOT NULL DEFAULT 'default_workspace',
+    query_text TEXT NOT NULL,
+    hit_count INTEGER NOT NULL DEFAULT 1,
+    zero_result_count INTEGER NOT NULL DEFAULT 0,
+    last_searched_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(workspace_id, query_text)
+);
+
+-- 7. Application Settings
 CREATE TABLE IF NOT EXISTS app_settings (
-    setting_key TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL DEFAULT 'default_workspace',
+    setting_key TEXT NOT NULL,
     setting_value TEXT NOT NULL,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY(workspace_id, setting_key)
 );
 
--- 5. Failed extractions table
-CREATE TABLE IF NOT EXISTS failed_extractions (
+-- 8. Audit Logs
+CREATE TABLE IF NOT EXISTS audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
-    error_type TEXT NOT NULL,
-    error_message TEXT NOT NULL,
-    occurred_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- 6. Operation audit logs table
-CREATE TABLE IF NOT EXISTS operation_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    operation TEXT NOT NULL,
-    folder_id INTEGER REFERENCES indexed_folders(id) ON DELETE SET NULL,
-    status TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    user_id TEXT,
+    action TEXT NOT NULL,
+    resource_type TEXT NOT NULL,
+    resource_id TEXT,
     details_json TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_ws ON audit_logs(workspace_id, created_at);
+
+-- 9. Synchronization Subsystem (Stage 6 Infrastructure)
+CREATE TABLE IF NOT EXISTS sync_connections (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    device_id TEXT NOT NULL,
+    device_name TEXT NOT NULL,
+    auth_token_hash TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'connected', -- connected, disconnected, paused
+    last_sync_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS sync_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    connection_id TEXT NOT NULL REFERENCES sync_connections(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    local_path TEXT NOT NULL,
+    cloud_prefix TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    sync_status TEXT NOT NULL DEFAULT 'idle', -- idle, syncing, paused, error
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS sync_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sync_source_id INTEGER NOT NULL REFERENCES sync_sources(id) ON DELETE CASCADE,
+    local_path_hash TEXT NOT NULL,
+    relative_path TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', -- pending, uploading, uploaded, indexing, synced, failed, conflict
+    cloud_file_id INTEGER REFERENCES files(id) ON DELETE SET NULL,
+    last_synced_at TEXT,
+    UNIQUE(sync_source_id, local_path_hash)
+);
+
+CREATE TABLE IF NOT EXISTS sync_jobs (
+    id TEXT PRIMARY KEY,
+    sync_source_id INTEGER NOT NULL REFERENCES sync_sources(id) ON DELETE CASCADE,
+    job_type TEXT NOT NULL, -- upload, reconcile, purge
+    status TEXT NOT NULL DEFAULT 'pending', -- pending, running, completed, failed
+    files_count INTEGER NOT NULL DEFAULT 0,
+    bytes_transferred INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     completed_at TEXT
 );
 
--- =====================================================================
--- INITIAL APPLICATION SETTINGS SEED
--- =====================================================================
-INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES
-('theme', 'dark'),
-('search_mode', 'hybrid'),
-('min_similarity', '0.25'),
-('top_k', '20'),
-('max_file_size_mb', '50'),
-('dark_mode', 'true'),
-('auto_start_worker', 'true'),
-('debounce_seconds', '2');
+CREATE TABLE IF NOT EXISTS sync_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sync_item_id INTEGER NOT NULL REFERENCES sync_items(id) ON DELETE CASCADE,
+    version_number INTEGER NOT NULL,
+    content_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS sync_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sync_item_id INTEGER REFERENCES sync_items(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    details_json TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 -- =====================================================================
--- SEED MONITORED COLLECTIONS & VERIFICATION DATA
+-- DEFAULT WORKSPACE & SETTINGS SEED (NO MOCK FILES)
 -- =====================================================================
-INSERT OR IGNORE INTO indexed_folders (id, path, path_hash, is_active, scan_status, file_count, created_at, last_scanned_at) VALUES
-(1, 'docs/financial', 'hash_docs_financial', 1, 'completed', 4, datetime('now', '-7 days'), datetime('now', '-1 hours')),
-(2, 'projects/ferret/docs', 'hash_ferret_docs', 1, 'completed', 3, datetime('now', '-14 days'), datetime('now', '-2 hours')),
-(3, 'archives/invoices_2026', 'hash_archives_invoices', 1, 'completed', 2, datetime('now', '-30 days'), datetime('now', '-5 hours'));
+INSERT OR IGNORE INTO users (id, email, display_name) VALUES
+('default_user', 'local@filearchaeologist.app', 'Default User');
 
--- Seed verified documents across PDF, DOCX, Code, Text, OCR categories
-INSERT OR IGNORE INTO files (id, folder_id, path_hash, full_path, filename, extension, size_bytes, modified_at, content_preview, extraction_status, vector_id) VALUES
-(1, 1, 'hash_inv_q1', 'docs/financial/Q1_Annual_Tax_Invoice_2026.pdf', 'Q1_Annual_Tax_Invoice_2026.pdf', '.pdf', 154200, '2026-03-28 14:22:00', 'Annual consolidated corporate tax invoice and balance sheet summary for March 2026 with payment confirmation.', 'done', 1),
-(2, 1, 'hash_acct_recon', 'docs/financial/Account_Reconciliation_Report.docx', 'Account_Reconciliation_Report.docx', '.docx', 84120, '2026-03-15 09:30:00', 'Quarterly account reconciliation, bank transaction discrepancies, vendor invoices, and cash flow audit.', 'done', 2),
-(3, 2, 'hash_arch_spec', 'projects/ferret/docs/Architecture_Specification.md', 'Architecture_Specification.md', '.md', 45100, '2026-04-10 11:15:00', 'Cloudflare deployment architecture specification, Workers Static Assets, D1 relational store, and vector embeddings.', 'done', 3),
-(4, 2, 'hash_db_schema', 'projects/ferret/docs/Database_Schema_Guide.pdf', 'Database_Schema_Guide.pdf', '.pdf', 210400, '2026-04-12 16:40:00', 'MySQL 8.0 to Cloudflare D1 SQLite database migration schema with atomic transactions and indexing.', 'done', 4),
-(5, 3, 'hash_receipt_scan', 'archives/invoices_2026/Hardware_Purchase_Receipt_OCR.png', 'Hardware_Purchase_Receipt_OCR.png', '.png', 320400, '2026-03-04 18:05:00', 'Scanned OCR hardware receipt from Micro Center for development workstations and NVMe SSD storage.', 'done', 5),
-(6, 2, 'hash_api_spec', 'projects/ferret/docs/REST_API_Endpoints.json', 'REST_API_Endpoints.json', '.json', 12300, '2026-04-18 10:00:00', 'Complete OpenAPI specification for Search, Index Management, History, and System Health endpoints.', 'done', 6);
+INSERT OR IGNORE INTO workspaces (id, name, owner_id) VALUES
+('default_workspace', 'Default Workspace', 'default_user');
 
--- Seed search history
-INSERT OR IGNORE INTO search_history (id, query_text, result_count, searched_at) VALUES
-(1, 'annual invoice March', 1, datetime('now', '-2 hours')),
-(2, 'database schema migration', 2, datetime('now', '-1 days')),
-(3, 'hardware receipt OCR', 1, datetime('now', '-2 days')),
-(4, 'quarterly tax report', 2, datetime('now', '-3 days'));
+INSERT OR IGNORE INTO workspace_members (workspace_id, user_id, role) VALUES
+('default_workspace', 'default_user', 'owner');
 
+INSERT OR IGNORE INTO app_settings (workspace_id, setting_key, setting_value) VALUES
+('default_workspace', 'theme', 'dark'),
+('default_workspace', 'search_mode', 'hybrid'),
+('default_workspace', 'min_similarity', '0.25'),
+('default_workspace', 'top_k', '20'),
+('default_workspace', 'max_file_size_mb', '50'),
+('default_workspace', 'dark_mode', 'true'),
+('default_workspace', 'auto_start_worker', 'true'),
+('default_workspace', 'worker_paused', 'false'),
+('default_workspace', 'debounce_seconds', '2');

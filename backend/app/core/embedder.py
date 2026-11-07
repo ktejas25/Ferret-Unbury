@@ -1,7 +1,7 @@
 import logging
 import hashlib
+from typing import List, Optional, Dict, Any
 import numpy as np
-from typing import List, Optional
 from app.config import settings
 
 logger = logging.getLogger("file_archaeologist.embedder")
@@ -12,6 +12,11 @@ class LocalEmbedder:
     Embedding service generating 384-dimensional L2-normalized vectors
     for semantic retrieval. Supports sentence-transformers (all-MiniLM-L6-v2)
     with seamless deterministic local vectorizer fallback for offline environments.
+    
+    Enhancements:
+    - Sliding-window document chunking (captures semantic content beyond initial characters)
+    - Full-document mean pooling with L2 re-normalization
+    - Explicit model availability and fallback diagnostics
     """
 
     def __init__(self, model_name: Optional[str] = None, dim: int = 384):
@@ -19,6 +24,7 @@ class LocalEmbedder:
         self.dim = dim
         self._model = None
         self._is_st_model = False
+        self._load_error: Optional[str] = None
         self._initialize_model()
 
     def _initialize_model(self) -> None:
@@ -27,14 +33,39 @@ class LocalEmbedder:
             logger.info(f"Loading SentenceTransformer model '{self.model_name}'...")
             self._model = SentenceTransformer(self.model_name)
             self._is_st_model = True
+            self._load_error = None
             logger.info("SentenceTransformer loaded successfully.")
         except Exception as e:
+            self._load_error = str(e)
             logger.warning(
                 f"SentenceTransformer not available or failed to load ({e}). "
                 "Using high-performance deterministic local embedding fallback."
             )
             self._model = None
             self._is_st_model = False
+
+    def _chunk_text(self, text: str, chunk_size: int = 1500, overlap: int = 250) -> List[str]:
+        """Splits long text into overlapping chunks to capture semantic content across the whole file."""
+        cleaned = text.strip()
+        if not cleaned:
+            return []
+        if len(cleaned) <= chunk_size:
+            return [cleaned]
+
+        chunks = []
+        start = 0
+        while start < len(cleaned):
+            end = min(start + chunk_size, len(cleaned))
+            chunk = cleaned[start:end].strip()
+            if chunk:
+                chunks.append(chunk)
+            if end >= len(cleaned):
+                break
+            start += (chunk_size - overlap)
+            # Cap at 20 chunks (~25k characters) to maintain bounded processing
+            if len(chunks) >= 20:
+                break
+        return chunks
 
     def _hash_vectorize(self, text: str) -> np.ndarray:
         """
@@ -44,18 +75,17 @@ class LocalEmbedder:
         vec = np.zeros(self.dim, dtype=np.float32)
         words = text.lower().split()
         if not words:
-            # Return fixed unit vector for empty input
             vec[0] = 1.0
             return vec
 
         for word in words:
-            # Word token
+            # Word token projection
             h = int(hashlib.md5(word.encode("utf-8")).hexdigest(), 16)
             idx = h % self.dim
             sign = 1.0 if ((h >> 16) & 1) else -1.0
             vec[idx] += sign
 
-            # Character 3-grams
+            # Character 3-grams projection
             if len(word) >= 3:
                 for i in range(len(word) - 2):
                     sub = word[i:i+3]
@@ -71,12 +101,8 @@ class LocalEmbedder:
             vec[0] = 1.0
         return vec.astype(np.float32)
 
-    def embed_document(self, text: str) -> np.ndarray:
-        """
-        Embeds extracted document text (first 2,000 characters as per v1 spec).
-        Returns 384-dimensional L2-normalized float32 vector.
-        """
-        cleaned = text[:2000].strip()
+    def _embed_single_text(self, text: str) -> np.ndarray:
+        cleaned = text.strip()
         if not cleaned:
             vec = np.zeros(self.dim, dtype=np.float32)
             vec[0] = 1.0
@@ -91,31 +117,49 @@ class LocalEmbedder:
 
         return self._hash_vectorize(cleaned)
 
-    def embed_query(self, query: str) -> np.ndarray:
+    def embed_document(self, text: str) -> np.ndarray:
         """
-        Embeds user search query.
-        Returns 384-dimensional L2-normalized float32 vector.
+        Embeds extracted document text using multi-chunk sliding window.
+        Aggregates chunks across the entire document via mean pooling and L2 normalization.
         """
-        cleaned = query.strip()
-        if not cleaned:
+        chunks = self._chunk_text(text)
+        if not chunks:
             vec = np.zeros(self.dim, dtype=np.float32)
             vec[0] = 1.0
             return vec
 
-        if self._is_st_model and self._model is not None:
-            try:
-                emb = self._model.encode(cleaned, normalize_embeddings=True)
-                return np.array(emb, dtype=np.float32)
-            except Exception as e:
-                logger.error(f"Error in SentenceTransformer query inference: {e}")
+        if len(chunks) == 1:
+            return self._embed_single_text(chunks[0])
 
-        return self._hash_vectorize(cleaned)
+        chunk_vectors = [self._embed_single_text(chunk) for chunk in chunks]
+        stacked = np.mean(np.stack(chunk_vectors), axis=0)
+        norm = np.linalg.norm(stacked)
+        if norm > 1e-9:
+            return (stacked / norm).astype(np.float32)
+        else:
+            stacked[0] = 1.0
+            return stacked.astype(np.float32)
+
+    def embed_query(self, query: str) -> np.ndarray:
+        """Embeds user search query into 384-dimensional unit vector."""
+        return self._embed_single_text(query)
 
     def is_ready(self) -> bool:
         return True
 
     def get_model_name(self) -> str:
-        return f"{self.model_name} (ST)" if self._is_st_model else f"{self.model_name} (Local-Subword)"
+        return f"{self.model_name} (SentenceTransformers)" if self._is_st_model else f"{self.model_name} (Deterministic-Subword)"
+
+    def get_diagnostics(self) -> Dict[str, Any]:
+        """Provides explicit diagnostic visibility into model state."""
+        return {
+            "configured_model": self.model_name,
+            "dimensions": self.dim,
+            "is_sentence_transformers": self._is_st_model,
+            "engine": "SentenceTransformers" if self._is_st_model else "Deterministic-Subword",
+            "is_fallback": not self._is_st_model,
+            "load_error": self._load_error
+        }
 
 
 embedder = LocalEmbedder()

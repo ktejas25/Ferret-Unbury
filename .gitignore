@@ -32,9 +32,12 @@ wheels/
 # Runtime Data
 data/*.bin
 data/*.pkl
+data/*.db*
 data/backups/*
 data/logs/*
+data/vector_index/*
 !data/.gitkeep
+!data/vector_index/.gitkeep
 
 # Node / Frontend
 node_modules/

@@ -39,3 +39,27 @@ def test_embedder_empty_input():
     empty_vec = embedder.embed_query("")
     assert empty_vec.shape == (384,)
     assert np.isclose(np.linalg.norm(empty_vec), 1.0, atol=1e-4)
+
+
+def test_embedder_long_document_chunking():
+    embedder = LocalEmbedder(dim=384)
+    # Generate 6,000 characters of text
+    long_doc = "Paragraph about database architecture and indexing. " * 120
+    doc_vec = embedder.embed_document(long_doc)
+
+    assert doc_vec.shape == (384,)
+    assert np.isclose(np.linalg.norm(doc_vec), 1.0, atol=1e-4)
+
+    # Verify chunks are created
+    chunks = embedder._chunk_text(long_doc, chunk_size=1500, overlap=250)
+    assert len(chunks) > 1
+
+
+def test_embedder_diagnostics():
+    embedder = LocalEmbedder(dim=384)
+    diag = embedder.get_diagnostics()
+
+    assert "configured_model" in diag
+    assert diag["dimensions"] == 384
+    assert "engine" in diag
+    assert "is_fallback" in diag

@@ -9,6 +9,7 @@ from app.core.scanner import folder_scanner, compute_path_hash
 from app.core.watcher import watcher_manager
 from app.core.worker import indexing_worker
 from app.core.vector_index import vector_index_manager
+from app.core.security import validate_safe_folder_path
 from app.models.schemas import FolderItem, IndexStatusResponse
 
 logger = logging.getLogger("file_archaeologist.index_service")
@@ -21,11 +22,9 @@ class IndexService:
     """
 
     def add_folder(self, raw_path: str) -> Tuple[bool, str, Optional[FolderItem]]:
-        path_obj = Path(raw_path).resolve()
-        if not path_obj.exists():
-            return False, f"Folder path '{raw_path}' does not exist on disk", None
-        if not path_obj.is_dir():
-            return False, f"Path '{raw_path}' is not a directory", None
+        is_safe, error_msg, path_obj = validate_safe_folder_path(raw_path)
+        if not is_safe or path_obj is None:
+            return False, error_msg, None
 
         normalized_path = str(path_obj)
         path_hash = compute_path_hash(normalized_path)
@@ -131,6 +130,7 @@ class IndexService:
             deleted_vector_count=del_vecs,
             index_size_bytes=idx_size,
             is_indexing=indexing_worker.is_indexing(),
+            is_paused=indexing_worker.is_paused(),
             current_task=indexing_worker.get_current_task(),
             last_scan_error=None,
             last_scanned_at=None

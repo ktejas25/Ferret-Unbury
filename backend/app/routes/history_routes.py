@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from app.models.schemas import HistoryResponse, GenericSuccessResponse
 from app.services.history_service import history_service
+from app.core.security import verify_api_authorization
 
 router = APIRouter(prefix="/api/history", tags=["Search History"])
 
@@ -11,7 +12,7 @@ def get_history(limit: int = Query(default=50, ge=1, le=500)):
     return history_service.get_history(limit=limit)
 
 
-@router.delete("", response_model=GenericSuccessResponse)
+@router.delete("", response_model=GenericSuccessResponse, dependencies=[Depends(verify_api_authorization)])
 def clear_history():
     """Clears all local search history entries."""
     history_service.clear_history()

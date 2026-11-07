@@ -1,6 +1,7 @@
 import {
   SearchResponse, FolderItem, IndexStatus, HistoryResponse,
-  HealthStatus, AppSettings, GenericResponse
+  HealthStatus, AppSettings, GenericResponse,
+  SyncStats, SyncSettings, SyncItem, SyncHistoryEntry
 } from '../types';
 
 const BASE_URL = '/api';
@@ -129,6 +130,92 @@ export const api = {
     return fetchJson<{ settings: AppSettings }>('/settings', {
       method: 'PUT',
       body: JSON.stringify({ settings }),
+    });
+  },
+
+  // Desktop-to-Cloud Sync Subsystem
+  getSyncStatus: (): Promise<SyncStats> => {
+    return fetchJson<SyncStats>('/sync/status');
+  },
+
+  getSyncSettings: (): Promise<SyncSettings> => {
+    return fetchJson<SyncSettings>('/sync/settings');
+  },
+
+  updateSyncSettings: (update: {
+    excluded_folders?: string[];
+    excluded_extensions?: string[];
+    max_file_size_bytes?: number;
+    retry_limit?: number;
+  }): Promise<SyncSettings> => {
+    return fetchJson<SyncSettings>('/sync/settings', {
+      method: 'POST',
+      body: JSON.stringify(update),
+    });
+  },
+
+  connectCloud: (params: { cloud_url: string; api_key?: string; workspace_id?: string }): Promise<GenericResponse> => {
+    return fetchJson<GenericResponse>('/sync/connect', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+
+  disconnectCloud: (): Promise<GenericResponse> => {
+    return fetchJson<GenericResponse>('/sync/disconnect', {
+      method: 'POST',
+    });
+  },
+
+  pauseSync: (): Promise<GenericResponse> => {
+    return fetchJson<GenericResponse>('/sync/pause', {
+      method: 'POST',
+    });
+  },
+
+  resumeSync: (): Promise<GenericResponse> => {
+    return fetchJson<GenericResponse>('/sync/resume', {
+      method: 'POST',
+    });
+  },
+
+  triggerSync: (): Promise<GenericResponse> => {
+    return fetchJson<GenericResponse>('/sync/trigger', {
+      method: 'POST',
+    });
+  },
+
+  addSyncFolder: (folder_path: string): Promise<GenericResponse> => {
+    return fetchJson<GenericResponse>('/sync/folders', {
+      method: 'POST',
+      body: JSON.stringify({ folder_path }),
+    });
+  },
+
+  removeSyncFolder: (folder_path: string): Promise<GenericResponse> => {
+    return fetchJson<GenericResponse>(`/sync/folders?folder_path=${encodeURIComponent(folder_path)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  retryFailedSync: (): Promise<GenericResponse> => {
+    return fetchJson<GenericResponse>('/sync/retry', {
+      method: 'POST',
+    });
+  },
+
+  getSyncItems: (limit: number = 100, status?: string): Promise<SyncItem[]> => {
+    const q = status ? `?limit=${limit}&status=${encodeURIComponent(status)}` : `?limit=${limit}`;
+    return fetchJson<SyncItem[]>(`/sync/items${q}`);
+  },
+
+  getSyncHistory: (limit: number = 50): Promise<SyncHistoryEntry[]> => {
+    return fetchJson<SyncHistoryEntry[]>(`/sync/history?limit=${limit}`);
+  },
+
+  removeCloudCopy: (local_path: string): Promise<GenericResponse> => {
+    return fetchJson<GenericResponse>(`/sync/cloud-copy?local_path=${encodeURIComponent(local_path)}`, {
+      method: 'DELETE',
     });
   },
 };

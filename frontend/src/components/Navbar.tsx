@@ -1,12 +1,13 @@
 import React from 'react';
-import { Search, FolderTree, History, Settings, Activity, Sparkles } from 'lucide-react';
-import { HealthStatus } from '../types';
+import { Search, FolderTree, History, Settings, Activity, Sparkles, Cloud } from 'lucide-react';
+import { HealthStatus, SyncStats } from '../types';
 
 interface NavbarProps {
   activeTab: 'search' | 'status' | 'history';
   setActiveTab: (tab: 'search' | 'status' | 'history') => void;
   onOpenSettings: () => void;
   health?: HealthStatus;
+  syncStats?: SyncStats;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -14,6 +15,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   onOpenSettings,
   health,
+  syncStats,
 }) => {
   const isHealthy = health?.status === 'healthy';
 
@@ -78,8 +80,26 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </nav>
 
-        {/* System Health & Settings */}
-        <div className="flex items-center space-x-3">
+        {/* Mode Indicator, System Health & Settings */}
+        <div className="flex items-center space-x-2.5">
+          {syncStats?.is_connected ? (
+            <div
+              className="hidden lg:flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/20"
+              title={`Cloud sync connected to workspace: ${syncStats.workspace_id || 'default'}`}
+            >
+              <Cloud className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Sync Active</span>
+            </div>
+          ) : (
+            <div
+              className="hidden lg:flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-mono bg-slate-800 text-slate-400 border border-slate-700/60"
+              title="Running in 100% offline local-first mode"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+              <span>Offline Local</span>
+            </div>
+          )}
+
           <div
             className={`flex items-center space-x-2 px-2.5 py-1 rounded-full text-xs font-mono border ${
               isHealthy

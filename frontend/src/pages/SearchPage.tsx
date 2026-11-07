@@ -82,8 +82,15 @@ export const SearchPage: React.FC<SearchPageProps> = ({
     return undefined;
   };
 
-  const executeSearch = async (searchQuery: string) => {
+  const executeSearch = async (
+    searchQuery: string,
+    overrideType?: string,
+    overrideDate?: string
+  ) => {
     if (!searchQuery.trim()) return;
+
+    const activeType = overrideType !== undefined ? overrideType : fileTypeFilter;
+    const activeDate = overrideDate !== undefined ? overrideDate : dateRangeFilter;
 
     setIsLoading(true);
     setError(null);
@@ -93,8 +100,8 @@ export const SearchPage: React.FC<SearchPageProps> = ({
       const res: SearchResponse = await api.searchFiles({
         query: searchQuery.trim(),
         top_k: 25,
-        file_types: getFileTypesArray(fileTypeFilter),
-        date_from: getDateFromFilter(dateRangeFilter),
+        file_types: getFileTypesArray(activeType),
+        date_from: getDateFromFilter(activeDate),
       });
       setResults(res.results);
       setTotal(res.total);
@@ -251,7 +258,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                 key={f.id}
                 onClick={() => {
                   setFileTypeFilter(f.id);
-                  if (query) executeSearch(query);
+                  if (query) executeSearch(query, f.id, dateRangeFilter);
                 }}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
                   fileTypeFilter === f.id
@@ -270,8 +277,9 @@ export const SearchPage: React.FC<SearchPageProps> = ({
             <select
               value={dateRangeFilter}
               onChange={(e) => {
-                setDateRangeFilter(e.target.value);
-                if (query) executeSearch(query);
+                const newDate = e.target.value;
+                setDateRangeFilter(newDate);
+                if (query) executeSearch(query, fileTypeFilter, newDate);
               }}
               className="bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             >

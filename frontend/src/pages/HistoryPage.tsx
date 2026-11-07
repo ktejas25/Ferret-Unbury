@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { History, Trash2, ArrowRight, Sparkles, HelpCircle } from 'lucide-react';
+import { History, Trash2, ArrowRight, Sparkles, HelpCircle, RefreshCw } from 'lucide-react';
 import { api } from '../api/client';
 import { HistoryItem } from '../types';
 
@@ -58,15 +58,26 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
           </p>
         </div>
 
-        {history.length > 0 && (
+        <div className="flex items-center space-x-2">
           <button
-            onClick={() => setShowClearModal(true)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-rose-500/10 hover:text-rose-400 text-slate-300 rounded-xl text-xs font-medium transition-colors border border-slate-700/60"
+            onClick={() => refetchHistory()}
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium transition-colors border border-slate-700/60"
+            title="Refresh search history"
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Clear History</span>
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Refresh</span>
           </button>
-        )}
+
+          {history.length > 0 && (
+            <button
+              onClick={() => setShowClearModal(true)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-rose-500/10 hover:text-rose-400 text-slate-300 rounded-xl text-xs font-medium transition-colors border border-slate-700/60"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear History</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}

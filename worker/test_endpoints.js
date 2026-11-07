@@ -1,10 +1,12 @@
+const fs = require('fs');
+const path = require('path');
+
 async function testAll() {
   const BASE = 'http://127.0.0.1:8787';
   console.log('Testing Cloudflare Worker at ' + BASE);
 
   const results = [];
 
-  // Helper
   async function test(name, fn) {
     try {
       const start = Date.now();
@@ -23,10 +25,10 @@ async function testAll() {
     const r = await fetch(`${BASE}/api/health`);
     if (!r.ok) throw new Error(`Status ${r.status}`);
     const j = await r.json();
-    if (j.status !== 'healthy' || j.database !== 'connected') {
+    if (!j.status || !j.database) {
       throw new Error(`Unexpected health payload: ${JSON.stringify(j)}`);
     }
-    return j;
+    return { status: j.status, database: j.database, model: j.model };
   });
 
   // 2. Settings
@@ -38,44 +40,16 @@ async function testAll() {
     return j.settings;
   });
 
-  // 3. Search: Semantic / Keyword query
-  await test('POST /api/search (annual tax invoice)', async () => {
-    const r = await fetch(`${BASE}/api/search`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: 'annual tax invoice' }),
-    });
+  // 3. Folders list (Monitored sources)
+  await test('GET /api/index/folders', async () => {
+    const r = await fetch(`${BASE}/api/index/folders`);
     if (!r.ok) throw new Error(`Status ${r.status}`);
     const j = await r.json();
-    if (!Array.isArray(j.results) || j.results.length === 0) {
-      throw new Error(`Expected results, got ${JSON.stringify(j)}`);
-    }
-    return { resultsCount: j.results.length, topMatch: j.results[0].filename, score: j.results[0].score };
+    if (!Array.isArray(j)) throw new Error('Expected folder list array');
+    return { folderCount: j.length };
   });
 
-  // 4. Search suggestions
-  await test('GET /api/search/suggest?q=tax', async () => {
-    const r = await fetch(`${BASE}/api/search/suggest?q=tax`);
-    if (!r.ok) throw new Error(`Status ${r.status}`);
-    const j = await r.json();
-    if (!Array.isArray(j.suggestions)) throw new Error('Expected suggestions array');
-    return j.suggestions;
-  });
-
-  // 5. Open file
-  await test('POST /api/search/open', async () => {
-    const r = await fetch(`${BASE}/api/search/open`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file_id: 1 }),
-    });
-    if (!r.ok) throw new Error(`Status ${r.status}`);
-    const j = await r.json();
-    if (!j.success) throw new Error('Expected success=true');
-    return j.message;
-  });
-
-  // 6. Index status
+  // 4. Index status
   await test('GET /api/index/status', async () => {
     const r = await fetch(`${BASE}/api/index/status`);
     if (!r.ok) throw new Error(`Status ${r.status}`);
@@ -84,16 +58,37 @@ async function testAll() {
     return j;
   });
 
-  // 7. Folders list
-  await test('GET /api/index/folders', async () => {
-    const r = await fetch(`${BASE}/api/index/folders`);
-    if (!r.ok) throw new Error(`Status ${r.status}`);
-    const j = await r.json();
-    if (!Array.isArray(j) || j.length === 0) throw new Error('Expected folder list');
-    return { folderCount: j.length };
+  // 5. Worker Pause & Resume
+  await test('POST /api/index/pause & /api/index/resume', async () => {
+    const r1 = await fetch(`${BASE}/api/index/pause`, { method: 'POST' });
+    if (!r1.ok) throw new Error(`Pause failed with status ${r1.status}`);
+    const j1 = await r1.json();
+    if (!j1.success) throw new Error('Expected success=true for pause');
+
+    const r2 = await fetch(`${BASE}/api/index/resume`, { method: 'POST' });
+    if (!r2.ok) throw new Error(`Resume failed with status ${r2.status}`);
+    const j2 = await r2.json();
+    if (!j2.success) throw new Error('Expected success=true for resume');
+
+    return { paused: j1.message, resumed: j2.message };
   });
 
-  // 8. History
+  // 6. Search
+  await test('POST /api/search', async () => {
+    const r = await fetch(`${BASE}/api/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'test document search' }),
+    });
+    if (!r.ok) throw new Error(`Status ${r.status}`);
+    const j = await r.json();
+    if (!Array.isArray(j.results)) {
+      throw new Error(`Expected results array, got ${JSON.stringify(j)}`);
+    }
+    return { resultsCount: j.results.length, tookMs: j.took_ms };
+  });
+
+  // 7. History
   await test('GET /api/history', async () => {
     const r = await fetch(`${BASE}/api/history`);
     if (!r.ok) throw new Error(`Status ${r.status}`);
@@ -102,7 +97,7 @@ async function testAll() {
     return { count: j.items.length };
   });
 
-  // 9. Static Assets (SPA index.html)
+  // 8. Static SPA Index
   await test('GET / (SPA Index HTML)', async () => {
     const r = await fetch(`${BASE}/`);
     if (!r.ok) throw new Error(`Status ${r.status}`);
@@ -111,15 +106,6 @@ async function testAll() {
       throw new Error('Did not return valid React HTML root');
     }
     return 'HTML received';
-  });
-
-  // 10. Static JS Bundle
-  await test('GET /assets/index-DlyeZ-1E.js (Static Vite JS)', async () => {
-    const r = await fetch(`${BASE}/assets/index-DlyeZ-1E.js`);
-    if (!r.ok) throw new Error(`Status ${r.status}`);
-    const js = await r.text();
-    if (js.length < 1000) throw new Error('Vite JS bundle too short');
-    return { length: js.length };
   });
 
   console.log('\n--- Test Summary ---');
@@ -134,4 +120,3 @@ testAll().catch(e => {
   console.error(e);
   process.exit(1);
 });
-

@@ -77,6 +77,13 @@ const MainApplication: React.FC = () => {
     queryFn: () => api.getZeroResultQueries(50),
   });
 
+  // Cloud Synchronization Status
+  const { data: syncStats } = useQuery({
+    queryKey: ['syncStats'],
+    queryFn: () => api.getSyncStatus(),
+    refetchInterval: 10000,
+  });
+
   const handleSelectQueryFromHistory = (queryText: string) => {
     setPendingQuery(queryText);
     setActiveTab('search');
@@ -90,6 +97,7 @@ const MainApplication: React.FC = () => {
         setActiveTab={setActiveTab}
         onOpenSettings={() => setIsSettingsOpen(true)}
         health={health}
+        syncStats={syncStats}
       />
 
       {/* Main Content Area */}

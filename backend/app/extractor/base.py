@@ -11,6 +11,13 @@ class ExtractionResult:
     is_skipped: bool = False
     skip_reason: Optional[str] = None
     error: Optional[str] = None
+    char_count: int = 0
+    extractor: Optional[str] = None
+    is_truncated: bool = False
+
+    def __post_init__(self):
+        if not self.char_count and self.text:
+            self.char_count = len(self.text)
 
 
 class BaseExtractor(ABC):
@@ -23,6 +30,8 @@ class BaseExtractor(ABC):
 
     def clean_text(self, text: str) -> str:
         """Normalizes excessive whitespace while preserving readable words."""
+        if not text:
+            return ""
         lines = [line.strip() for line in text.splitlines()]
         cleaned = " ".join([l for l in lines if l])
         return " ".join(cleaned.split())

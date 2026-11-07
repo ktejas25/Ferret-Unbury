@@ -10,6 +10,7 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
 from app.core.scanner import compute_path_hash, EXCLUDED_DIRS
 from app.core.metadata_store import metadata_store
+from app.core.file_lifecycle import file_lifecycle
 from app.config import settings
 
 logger = logging.getLogger("file_archaeologist.watcher")
@@ -56,55 +57,25 @@ class FileChangeHandler(FileSystemEventHandler):
             return
         if self._should_debounce(event.src_path):
             return
-        self._handle_file_upsert(event.src_path)
+        file_lifecycle.handle_file_created_or_modified(self.folder_id, event.src_path)
 
     def on_modified(self, event: FileSystemEvent) -> None:
         if event.is_directory or self._is_ignored(event.src_path):
             return
         if self._should_debounce(event.src_path):
             return
-        self._handle_file_upsert(event.src_path)
+        file_lifecycle.handle_file_created_or_modified(self.folder_id, event.src_path)
 
     def on_deleted(self, event: FileSystemEvent) -> None:
         if event.is_directory or self._is_ignored(event.src_path):
             return
-        path_hash = compute_path_hash(event.src_path)
         logger.info(f"File deleted event: {event.src_path}")
-        metadata_store.soft_delete_file(path_hash)
+        file_lifecycle.handle_file_deleted(event.src_path)
 
     def on_moved(self, event: FileSystemEvent) -> None:
         if event.is_directory:
             return
-        # Old file is soft-deleted
-        old_hash = compute_path_hash(event.src_path)
-        metadata_store.soft_delete_file(old_hash)
-
-        # Dest file is upserted
-        if not self._is_ignored(event.dest_path):
-            self._handle_file_upsert(event.dest_path)
-
-    def _handle_file_upsert(self, file_path: str) -> None:
-        p = Path(file_path)
-        if not p.exists() or not p.is_file():
-            return
-        try:
-            stat = p.stat()
-            size_bytes = stat.st_size
-            modified_at = datetime.fromtimestamp(stat.st_mtime)
-            path_hash = compute_path_hash(file_path)
-
-            metadata_store.upsert_file(
-                folder_id=self.folder_id,
-                path_hash=path_hash,
-                full_path=str(p.resolve()),
-                filename=p.name,
-                extension=p.suffix.lower(),
-                size_bytes=size_bytes,
-                modified_at=modified_at
-            )
-            logger.info(f"Discovered/Modified file via watcher: {p.name}")
-        except Exception as e:
-            logger.warning(f"Error handling watcher event for '{file_path}': {e}")
+        file_lifecycle.handle_file_moved(event.src_path, event.dest_path, self.folder_id)
 
 
 class WatcherManager:

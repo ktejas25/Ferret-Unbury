@@ -1,10 +1,11 @@
 from typing import List
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, Depends
 from app.models.schemas import (
     IndexStatusResponse, FolderItem, AddFolderRequest,
     RebuildIndexRequest, GenericSuccessResponse
 )
 from app.services.index_service import index_service
+from app.core.security import verify_api_authorization
 
 router = APIRouter(prefix="/api/index", tags=["Index Management"])
 
@@ -21,7 +22,7 @@ def list_folders():
     return index_service.list_folders()
 
 
-@router.post("/folders", response_model=FolderItem)
+@router.post("/folders", response_model=FolderItem, dependencies=[Depends(verify_api_authorization)])
 def add_folder(req: AddFolderRequest):
     """Registers a new folder for monitoring, validates path, and initiates initial scan."""
     success, msg, item = index_service.add_folder(req.path)
@@ -32,7 +33,7 @@ def add_folder(req: AddFolderRequest):
     return item
 
 
-@router.delete("/folders/{folder_id}", response_model=GenericSuccessResponse)
+@router.delete("/folders/{folder_id}", response_model=GenericSuccessResponse, dependencies=[Depends(verify_api_authorization)])
 def remove_folder(folder_id: int = Path(..., ge=1)):
     """Removes a folder from monitoring and safely cleans up associated vectors."""
     success, msg = index_service.remove_folder(folder_id)
@@ -41,7 +42,7 @@ def remove_folder(folder_id: int = Path(..., ge=1)):
     return GenericSuccessResponse(success=True, message=msg)
 
 
-@router.post("/rebuild", response_model=GenericSuccessResponse)
+@router.post("/rebuild", response_model=GenericSuccessResponse, dependencies=[Depends(verify_api_authorization)])
 def rebuild_index(req: RebuildIndexRequest):
     """Resets the vector index and database state to trigger a full re-indexing of all monitored files."""
     if not req.confirm:
@@ -52,14 +53,14 @@ def rebuild_index(req: RebuildIndexRequest):
     return GenericSuccessResponse(success=True, message=msg)
 
 
-@router.post("/pause", response_model=GenericSuccessResponse)
+@router.post("/pause", response_model=GenericSuccessResponse, dependencies=[Depends(verify_api_authorization)])
 def pause_worker():
     """Pauses background indexing workers without stopping search or API services."""
     success, msg = index_service.pause_worker()
     return GenericSuccessResponse(success=success, message=msg)
 
 
-@router.post("/resume", response_model=GenericSuccessResponse)
+@router.post("/resume", response_model=GenericSuccessResponse, dependencies=[Depends(verify_api_authorization)])
 def resume_worker():
     """Resumes paused background indexing workers."""
     success, msg = index_service.resume_worker()

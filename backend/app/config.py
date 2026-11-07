@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Set
+from typing import Set, Optional
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
@@ -26,10 +26,12 @@ class Settings(BaseModel):
     # API Configuration
     API_HOST: str = Field(default_factory=lambda: os.getenv("API_HOST", "127.0.0.1"))
     API_PORT: int = Field(default_factory=lambda: int(os.getenv("API_PORT", "8420")))
+    API_KEY: Optional[str] = Field(default_factory=lambda: os.getenv("API_KEY", None))
+    REQUIRE_AUTH: bool = Field(default_factory=lambda: os.getenv("REQUIRE_AUTH", "false").lower() in ("true", "1", "yes"))
 
     # Vector Index & Model Configuration
     EMBEDDING_MODEL: str = Field(default_factory=lambda: os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2"))
-    INDEX_PATH: str = Field(default_factory=lambda: os.getenv("INDEX_PATH", "data/vector_index.bin"))
+    INDEX_DIR: str = Field(default_factory=lambda: os.getenv("INDEX_DIR", "data/vector_index"))
     DATA_DIR: str = Field(default_factory=lambda: os.getenv("DATA_DIR", "data"))
     VECTOR_DIM: int = Field(default=384)
 
@@ -66,13 +68,17 @@ class Settings(BaseModel):
         p.mkdir(parents=True, exist_ok=True)
         return p
 
-    def get_resolved_index_path(self) -> Path:
-        p = Path(self.INDEX_PATH)
+    def get_resolved_index_dir(self) -> Path:
+        p = Path(self.INDEX_DIR)
         if not p.is_absolute():
             root = Path(__file__).resolve().parent.parent.parent
             p = root / p
-        p.parent.mkdir(parents=True, exist_ok=True)
+        p.mkdir(parents=True, exist_ok=True)
         return p
+
+    def get_resolved_index_path(self) -> Path:
+        # Backward compatibility for legacy single-file references
+        return self.get_resolved_index_dir() / "vectors.hnsw"
 
 
 settings = Settings()

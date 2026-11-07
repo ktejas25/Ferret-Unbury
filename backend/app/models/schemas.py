@@ -73,6 +73,7 @@ class IndexStatusResponse(BaseModel):
     deleted_vector_count: int
     index_size_bytes: int
     is_indexing: bool
+    is_paused: bool = False
     current_task: Optional[str] = None
     last_scan_error: Optional[str] = None
     last_scanned_at: Optional[datetime] = None

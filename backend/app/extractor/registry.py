@@ -5,6 +5,7 @@ from app.extractor.base import BaseExtractor, ExtractionResult
 from app.extractor.text_extractor import TextExtractor
 from app.extractor.pdf_extractor import PdfExtractor
 from app.extractor.docx_extractor import DocxExtractor
+from app.extractor.legacy_doc_extractor import LegacyDocExtractor
 from app.extractor.html_extractor import HtmlExtractor
 from app.extractor.image_extractor import ImageExtractor
 from app.config import settings
@@ -22,6 +23,7 @@ class ExtractorRegistry:
         self.text_extractor = TextExtractor()
         self.pdf_extractor = PdfExtractor()
         self.docx_extractor = DocxExtractor()
+        self.legacy_doc_extractor = LegacyDocExtractor()
         self.html_extractor = HtmlExtractor()
         self.image_extractor = ImageExtractor()
 
@@ -29,8 +31,10 @@ class ExtractorRegistry:
         normalized = ext.lower()
         if normalized == ".pdf":
             return self.pdf_extractor
-        elif normalized in (".docx", ".doc"):
+        elif normalized == ".docx":
             return self.docx_extractor
+        elif normalized == ".doc":
+            return self.legacy_doc_extractor
         elif normalized in (".html", ".htm"):
             return self.html_extractor
         elif normalized in ImageExtractor.SUPPORTED_EXTENSIONS:
@@ -46,7 +50,10 @@ class ExtractorRegistry:
         # Check ignored extensions
         ext = file_path.suffix.lower()
         if ext in settings.ignored_extension_set:
-            return ExtractionResult(text="", preview="", is_skipped=True, skip_reason=f"Extension '{ext}' is in ignored extensions list")
+            return ExtractionResult(
+                text="", preview="", is_skipped=True,
+                skip_reason=f"Extension '{ext}' is in ignored extensions list"
+            )
 
         # Check maximum file size
         try:
@@ -69,9 +76,14 @@ class ExtractorRegistry:
             )
 
         try:
-            return extractor.extract(file_path)
+            res = extractor.extract(file_path)
+            return res
         except Exception as e:
-            return ExtractionResult(text="", preview="", error=f"Unhandled extraction error: {e}")
+            logger.error(f"Unexpected unhandled extractor crash on {file_path.name}: {e}")
+            return ExtractionResult(
+                text="", preview="", error=f"Extractor crash: {str(e)[:200]}"
+            )
 
 
+# Global singleton instance
 extractor_registry = ExtractorRegistry()
