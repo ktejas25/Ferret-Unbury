@@ -1,12 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { Navbar } from './components/Navbar';
+import { AppLayout } from './layouts/AppLayout';
+import { OverviewPage } from './pages/OverviewPage';
 import { SearchPage } from './pages/SearchPage';
+import { RecentActivityPage } from './pages/RecentActivityPage';
+import { DocumentsLibraryPage } from './pages/DocumentsLibraryPage';
+import { FavoritesPage } from './pages/FavoritesPage';
+import { CollectionsPage } from './pages/CollectionsPage';
+import { DuplicatesPage } from './pages/DuplicatesPage';
+import { AIAssistantPage } from './pages/AIAssistantPage';
+import { KnowledgeGraphPage } from './pages/KnowledgeGraphPage';
+import { ComparisonPage } from './pages/ComparisonPage';
+import { TimelinePage } from './pages/TimelinePage';
 import { StatusPage } from './pages/StatusPage';
-import { HistoryPage } from './pages/HistoryPage';
+import { CloudSyncPage } from './pages/CloudSyncPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SettingsModal } from './components/SettingsModal';
+import { DocumentPreviewModal } from './components/DocumentPreviewModal';
+import { DocumentDetailsDrawer } from './components/DocumentDetailsDrawer';
+import { CommandPalette } from './components/CommandPalette';
 import { api } from './api/client';
-import { ShieldCheck, Database, Cpu, Lock, Sparkles } from 'lucide-react';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,25 +30,61 @@ const queryClient = new QueryClient({
   },
 });
 
-const MainApplication: React.FC = () => {
-  const getTabFromPath = (): 'search' | 'status' | 'history' => {
-    const path = window.location.pathname.toLowerCase();
-    if (path.startsWith('/status')) return 'status';
-    if (path.startsWith('/history')) return 'history';
-    return 'search';
-  };
+type TabId =
+  | 'overview'
+  | 'search'
+  | 'activity'
+  | 'documents'
+  | 'favorites'
+  | 'collections'
+  | 'duplicates'
+  | 'assistant'
+  | 'graph'
+  | 'compare'
+  | 'timeline'
+  | 'status'
+  | 'sync'
+  | 'analytics';
 
-  const [activeTab, setActiveTabState] = useState<'search' | 'status' | 'history'>(getTabFromPath);
+const VALID_TABS: Record<string, TabId> = {
+  overview: 'overview',
+  search: 'search',
+  activity: 'activity',
+  history: 'activity',
+  documents: 'documents',
+  favorites: 'favorites',
+  collections: 'collections',
+  duplicates: 'duplicates',
+  assistant: 'assistant',
+  graph: 'graph',
+  compare: 'compare',
+  timeline: 'timeline',
+  status: 'status',
+  sync: 'sync',
+  analytics: 'analytics',
+};
+
+const getTabFromPath = (): TabId => {
+  const segment = window.location.pathname.replace(/^\//, '').toLowerCase();
+  return VALID_TABS[segment] || 'overview';
+};
+
+const MainApplication: React.FC = () => {
+  const [activeTab, setActiveTabState] = useState<TabId>(getTabFromPath);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [previewFileId, setPreviewFileId] = useState<number | null>(null);
+  const [detailsFileId, setDetailsFileId] = useState<number | null>(null);
   const [pendingQuery, setPendingQuery] = useState<string | undefined>(undefined);
 
-  const setActiveTab = (tab: 'search' | 'status' | 'history') => {
-    setActiveTabState(tab);
-    const targetPath = tab === 'search' ? '/' : `/${tab}`;
+  const setActiveTab = useCallback((tab: string) => {
+    const valid = VALID_TABS[tab] || 'overview';
+    setActiveTabState(valid);
+    const targetPath = valid === 'overview' ? '/' : `/${valid}`;
     if (window.location.pathname !== targetPath) {
-      window.history.pushState({ tab }, '', targetPath);
+      window.history.pushState({ tab: valid }, '', targetPath);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -45,67 +94,75 @@ const MainApplication: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Poll system health
+  // Global keyboard shortcut: Ctrl+K or Cmd+K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Health and background status polling
   const { data: health } = useQuery({
     queryKey: ['systemHealth'],
     queryFn: () => api.getHealth(),
     refetchInterval: 5000,
   });
 
-  // Poll index status
   const { data: indexStatus, refetch: refetchStatus } = useQuery({
     queryKey: ['indexStatus'],
     queryFn: () => api.getIndexStatus(),
     refetchInterval: 3000,
   });
 
-  // Poll monitored folders
   const { data: folders = [], refetch: refetchFolders } = useQuery({
     queryKey: ['foldersList'],
     queryFn: () => api.getFolders(),
     refetchInterval: 5000,
   });
 
-  // Search History
-  const { data: historyData, refetch: refetchHistory } = useQuery({
-    queryKey: ['searchHistory'],
-    queryFn: () => api.getHistory(50),
-  });
-
-  // Zero-Result History (Insights)
-  const { data: zeroResultData } = useQuery({
-    queryKey: ['zeroResultHistory'],
-    queryFn: () => api.getZeroResultQueries(50),
-  });
-
-  // Cloud Synchronization Status
   const { data: syncStats } = useQuery({
-    queryKey: ['syncStats'],
+    queryKey: ['syncStatsGlobal'],
     queryFn: () => api.getSyncStatus(),
     refetchInterval: 10000,
   });
 
-  const handleSelectQueryFromHistory = (queryText: string) => {
+  const handleRepeatSearch = (queryText: string) => {
     setPendingQuery(queryText);
     setActiveTab('search');
   };
 
-  return (
-    <div className="relative min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200 overflow-x-hidden">
-      {/* Subtle Ambient Glow Effect */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[360px] bg-gradient-to-b from-indigo-500/10 via-violet-500/5 to-transparent blur-3xl pointer-events-none -z-10" />
+  const handleOpenPreview = (fileId: number) => {
+    setPreviewFileId(fileId);
+  };
 
-      {/* Top Navbar */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
+  const handleOpenDetails = (fileId: number) => {
+    setDetailsFileId(fileId);
+  };
+
+  return (
+    <>
+      <AppLayout
+        currentTab={activeTab}
+        onSelectTab={setActiveTab}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         health={health}
         syncStats={syncStats}
-      />
+        totalDocuments={indexStatus?.total_files ?? 0}
+      >
+        {activeTab === 'overview' && (
+          <OverviewPage
+            onNavigate={setActiveTab}
+            onOpenPreview={handleOpenPreview}
+            onRepeatSearch={handleRepeatSearch}
+          />
+        )}
 
-      {/* Main Content Area */}
-      <main className="flex-1">
         {activeTab === 'search' && (
           <SearchPage
             initialQuery={pendingQuery}
@@ -113,6 +170,68 @@ const MainApplication: React.FC = () => {
             onNavigateToStatus={() => setActiveTab('status')}
             foldersCount={folders.length}
             totalIndexedFiles={indexStatus?.total_files ?? 0}
+            onPreviewFile={handleOpenPreview}
+            onOpenDetails={handleOpenDetails}
+          />
+        )}
+
+        {activeTab === 'activity' && (
+          <RecentActivityPage
+            onOpenPreview={handleOpenPreview}
+            onRepeatSearch={handleRepeatSearch}
+          />
+        )}
+
+        {activeTab === 'documents' && (
+          <DocumentsLibraryPage
+            onOpenPreview={handleOpenPreview}
+            onOpenDetails={handleOpenDetails}
+          />
+        )}
+
+        {activeTab === 'favorites' && (
+          <FavoritesPage
+            onOpenPreview={handleOpenPreview}
+            onOpenDetails={handleOpenDetails}
+          />
+        )}
+
+        {activeTab === 'collections' && (
+          <CollectionsPage
+            onOpenPreview={handleOpenPreview}
+            onOpenDetails={handleOpenDetails}
+          />
+        )}
+
+        {activeTab === 'duplicates' && (
+          <DuplicatesPage
+            onOpenPreview={handleOpenPreview}
+            onOpenDetails={handleOpenDetails}
+          />
+        )}
+
+        {activeTab === 'assistant' && (
+          <AIAssistantPage
+            onOpenPreview={handleOpenPreview}
+          />
+        )}
+
+        {activeTab === 'graph' && (
+          <KnowledgeGraphPage
+            onOpenPreview={handleOpenPreview}
+            onOpenDetails={handleOpenDetails}
+          />
+        )}
+
+        {activeTab === 'compare' && (
+          <ComparisonPage
+            onOpenPreview={handleOpenPreview}
+          />
+        )}
+
+        {activeTab === 'timeline' && (
+          <TimelinePage
+            onOpenPreview={handleOpenPreview}
           />
         )}
 
@@ -125,51 +244,44 @@ const MainApplication: React.FC = () => {
           />
         )}
 
-        {activeTab === 'history' && (
-          <HistoryPage
-            history={historyData?.items || []}
-            zeroResultQueries={zeroResultData?.items || []}
-            onSelectQuery={handleSelectQueryFromHistory}
-            refetchHistory={refetchHistory}
-          />
+        {activeTab === 'sync' && (
+          <CloudSyncPage />
         )}
-      </main>
 
-      {/* App Settings Modal */}
+        {activeTab === 'analytics' && (
+          <AnalyticsPage />
+        )}
+      </AppLayout>
+
+      {/* Global Interactive Modals & Drawers */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigate={setActiveTab}
+        onOpenFilePreview={handleOpenPreview}
+      />
+
+      <DocumentPreviewModal
+        fileId={previewFileId}
+        onClose={() => setPreviewFileId(null)}
+      />
+
+      <DocumentDetailsDrawer
+        fileId={detailsFileId}
+        onClose={() => setDetailsFileId(null)}
+        onOpenPreview={handleOpenPreview}
+        onFavoriteToggled={() => {
+          queryClient.invalidateQueries({ queryKey: ['documentsList'] });
+          queryClient.invalidateQueries({ queryKey: ['favoritesList'] });
+        }}
+      />
+
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         health={health}
       />
-
-      {/* Local-First Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/90 py-5 px-6 text-center text-xs text-slate-500 font-mono">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center space-x-2 text-slate-400">
-            <span className="font-semibold text-slate-300">File Archaeologist</span>
-            <span>•</span>
-            <span className="text-[11px]">v1.0 Pro</span>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-4 text-[11px] text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>100% Local-First & Private</span>
-            </span>
-            <span className="hidden md:inline">•</span>
-            <span className="flex items-center gap-1.5">
-              <Database className="w-3.5 h-3.5 text-indigo-400" />
-              <span>MySQL 8 & Vector ANN</span>
-            </span>
-            <span className="hidden md:inline">•</span>
-            <span className="flex items-center gap-1.5">
-              <Cpu className="w-3.5 h-3.5 text-violet-400" />
-              <span>On-Device Embeddings</span>
-            </span>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </>
   );
 };
 

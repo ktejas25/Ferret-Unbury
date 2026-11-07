@@ -280,6 +280,8 @@ interface ResultCardProps {
   onOpen: (fileId: number, revealFolder: boolean) => void;
   onCopy: (fileId: number, path: string) => void;
   onToggleSnippet: (fileId: number) => void;
+  onPreview?: (fileId: number) => void;
+  onDetails?: (fileId: number) => void;
 }
 
 const ResultCard = memo(function ResultCard({
@@ -289,6 +291,8 @@ const ResultCard = memo(function ResultCard({
   onOpen,
   onCopy,
   onToggleSnippet,
+  onPreview,
+  onDetails,
 }: ResultCardProps) {
   const { Icon, color } = getFileStyle(item.extension);
   const percent = toPercent(item.score);
@@ -305,8 +309,8 @@ const ResultCard = memo(function ResultCard({
           <div className="min-w-0">
             <button
               type="button"
-              onClick={() => onOpen(item.file_id, false)}
-              title={item.filename}
+              onClick={() => onPreview ? onPreview(item.file_id) : onOpen(item.file_id, false)}
+              title={`${item.filename} (Click to preview)`}
               className={`block max-w-full truncate rounded text-left text-sm font-semibold text-slate-100 transition-colors hover:text-indigo-300 sm:text-base ${FOCUS_RING}`}
             >
               {item.filename}
@@ -340,6 +344,30 @@ const ResultCard = memo(function ResultCard({
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-1">
+          {onPreview && (
+            <button
+              type="button"
+              onClick={() => onPreview(item.file_id)}
+              title="Preview document"
+              aria-label={`Preview ${item.filename}`}
+              className={`rounded-xl border border-transparent p-2 text-slate-400 transition-colors hover:border-slate-700/60 hover:bg-slate-800/90 hover:text-slate-100 ${FOCUS_RING}`}
+            >
+              <Eye className="h-4 w-4" aria-hidden />
+            </button>
+          )}
+
+          {onDetails && (
+            <button
+              type="button"
+              onClick={() => onDetails(item.file_id)}
+              title="View metadata and entities"
+              aria-label={`Details for ${item.filename}`}
+              className={`rounded-xl border border-transparent p-2 text-slate-400 transition-colors hover:border-slate-700/60 hover:bg-slate-800/90 hover:text-slate-100 ${FOCUS_RING}`}
+            >
+              <Info className="h-4 w-4" aria-hidden />
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => onOpen(item.file_id, false)}
@@ -619,6 +647,8 @@ interface SearchPageProps {
   onNavigateToStatus?: () => void;
   foldersCount?: number;
   totalIndexedFiles?: number;
+  onPreviewFile?: (fileId: number) => void;
+  onOpenDetails?: (fileId: number) => void;
 }
 
 export const SearchPage: React.FC<SearchPageProps> = ({
@@ -627,6 +657,8 @@ export const SearchPage: React.FC<SearchPageProps> = ({
   onNavigateToStatus,
   foldersCount = 0,
   totalIndexedFiles = 0,
+  onPreviewFile,
+  onOpenDetails,
 }) => {
   const listboxId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1049,6 +1081,8 @@ export const SearchPage: React.FC<SearchPageProps> = ({
                 onOpen={openFile}
                 onCopy={copyPath}
                 onToggleSnippet={toggleSnippet}
+                onPreview={onPreviewFile}
+                onDetails={onOpenDetails}
               />
             ))}
           </div>

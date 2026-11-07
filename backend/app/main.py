@@ -14,7 +14,10 @@ from app.core.metadata_store import metadata_store
 from app.core.vector_index import vector_index_manager
 from app.core.watcher import watcher_manager
 from app.core.worker import indexing_worker
-from app.routes import search_router, index_router, history_router, system_router, sync_router
+from app.routes import (
+    search_router, index_router, history_router, system_router, sync_router,
+    document_router, collection_router, assistant_router, discovery_router, analytics_router
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -88,6 +91,11 @@ app.include_router(index_router)
 app.include_router(history_router)
 app.include_router(system_router)
 app.include_router(sync_router)
+app.include_router(document_router)
+app.include_router(collection_router)
+app.include_router(assistant_router)
+app.include_router(discovery_router)
+app.include_router(analytics_router)
 
 # Serve built frontend static assets if available
 def get_static_dir() -> Path:

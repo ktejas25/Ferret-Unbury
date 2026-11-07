@@ -1,4 +1,5 @@
 import time
+import os
 import tempfile
 import shutil
 from pathlib import Path
@@ -21,23 +22,24 @@ def check_db():
 
 
 def test_complete_end_to_end_lifecycle():
-    # Pause the background worker so this test can deterministically step through
-    indexing_worker.pause()
+    # Stop the background worker so this test can deterministically step through
+    indexing_worker.stop(timeout=5.0)
 
     temp_dir = tempfile.mkdtemp(prefix="file_archaeologist_test_")
     test_folder = Path(temp_dir)
+    run_id = f"{os.getpid()}_{int(time.time())}"
 
     try:
-        # 1. Create sample documents
-        file1 = test_folder / "invoice_march_2025.txt"
+        # 1. Create sample documents with unique names
+        file1 = test_folder / f"invoice_march_{run_id}.txt"
         file1.write_text(
-            "Acme Corp Invoice number 90210. Total due: $4,500.00 for consulting services rendered in March 2025.",
+            f"Acme Corp Invoice number 90210 {run_id}. Total due: $4,500.00 for consulting services rendered in March 2025.",
             encoding="utf-8"
         )
 
-        file2 = test_folder / "project_notes.md"
+        file2 = test_folder / f"project_notes_{run_id}.md"
         file2.write_text(
-            "# Architecture Notes\n\nWe decided to adopt a local-first search strategy using cosine similarity.",
+            f"# Architecture Notes {run_id}\n\nWe decided to adopt a local-first search strategy using cosine similarity.",
             encoding="utf-8"
         )
 
@@ -76,8 +78,8 @@ def test_complete_end_to_end_lifecycle():
 
         assert res.total > 0
         filenames = [r.filename for r in res.results]
-        assert "invoice_march_2025.txt" in filenames
-        top_match = next(r for r in res.results if r.filename == "invoice_march_2025.txt")
+        assert file1.name in filenames
+        top_match = next(r for r in res.results if r.filename == file1.name)
         assert top_match.score > 0.0
 
         # 8. Test file type filter
@@ -106,13 +108,18 @@ def test_complete_end_to_end_lifecycle():
         assert len(deleted_records) > 0
 
         # Search should not return deleted file
-        req_after_del = SearchRequest(query="consulting invoice March", top_k=5)
+        req_after_del = SearchRequest(query=f"consulting invoice March {run_id}", top_k=5)
         res_after_del = search_service.search(req_after_del)
-        assert not any(r.filename == "invoice_march_2025.txt" for r in res_after_del.results)
+        assert not any(r.filename == file1.name for r in res_after_del.results)
 
         # 11. Cleanup folder
         index_service.remove_folder(folder_id)
 
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
-        indexing_worker.resume()
+        try:
+            if 'folder_id' in locals():
+                index_service.remove_folder(folder_id)
+        except Exception:
+            pass
+        indexing_worker.start()

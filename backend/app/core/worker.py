@@ -256,6 +256,24 @@ class IndexingWorker:
             self._backoff_schedule.pop(file_id, None)
             logger.info(f"Indexed file {file_id}: {fname} ({len(res.text)} chars)")
 
+            # 7. Asynchronous Document Classification & Structured Extraction
+            try:
+                from app.services.classifier_service import classifier_service
+                from app.services.extraction_service import extraction_service
+                cat, conf = classifier_service.classify_and_save(
+                    file_id=file_id,
+                    filename=fname,
+                    extension=item.get("extension", ""),
+                    text_content=res.text
+                )
+                extraction_service.extract_and_save(
+                    file_id=file_id,
+                    category=cat,
+                    text=res.text
+                )
+            except Exception as e:
+                logger.warning(f"Non-blocking classification/extraction skipped for file {file_id}: {e}")
+
         except Exception as e:
             logger.error(f"Failed processing file {file_id} ({full_path_str}): {e}")
             self._handle_failure(

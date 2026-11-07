@@ -214,3 +214,47 @@ def init_database() -> None:
             logger.info("Stored procedures initialized successfully.")
         except Exception as e:
             logger.error(f"Failed executing stored procedures migration: {e}")
+
+    # Apply platform enhancements migration 003
+    enhancement_sql_path = os.path.join(migrations_dir, "003_platform_enhancements.sql")
+    try:
+        raw_conn = get_raw_connection()
+        with raw_conn.cursor() as cur:
+            # 1. Safely add columns to `files`
+            cur.execute("""
+                SELECT COLUMN_NAME
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'files';
+            """, (settings.MYSQL_DATABASE,))
+            existing_cols = {r["COLUMN_NAME"] for r in cur.fetchall()}
+
+            cols_to_add = [
+                ("is_favorite", "TINYINT(1) NOT NULL DEFAULT 0"),
+                ("category", "VARCHAR(64) NULL"),
+                ("category_confidence", "FLOAT NULL"),
+                ("category_model", "VARCHAR(64) NULL"),
+                ("category_user_override", "VARCHAR(64) NULL"),
+                ("category_updated_at", "DATETIME NULL"),
+            ]
+            for col_name, col_def in cols_to_add:
+                if col_name not in existing_cols:
+                    try:
+                        cur.execute(f"ALTER TABLE `files` ADD COLUMN `{col_name}` {col_def};")
+                        logger.info(f"Added column {col_name} to files table.")
+                    except Exception as e:
+                        logger.warning(f"Could not add column {col_name}: {e}")
+
+            # 2. Execute CREATE TABLE statements from 003
+            if os.path.exists(enhancement_sql_path):
+                with open(enhancement_sql_path, "r", encoding="utf-8") as f:
+                    enh_sql = f.read()
+                for stmt in enh_sql.split(";"):
+                    lines = [l for l in stmt.split("\n") if not l.strip().startswith("--")]
+                    clean = "\n".join(lines).strip()
+                    if clean:
+                        cur.execute(clean)
+
+        raw_conn.close()
+        logger.info("Platform enhancements schema (003) initialized successfully.")
+    except Exception as e:
+        logger.error(f"Failed executing platform enhancements migration: {e}")

@@ -1,4 +1,6 @@
 import os
+import time
+import os
 import hashlib
 from datetime import datetime
 import pytest
@@ -21,14 +23,15 @@ def test_stored_procedures_lifecycle():
     folder_id = folder["id"]
     assert folder_id > 0
 
-    # 2. Test sp_upsert_file
-    file_path = "D:/TestFolder_UnitTest/document.txt"
+    # 2. Test sp_upsert_file with unique file to avoid limit truncation
+    unique_tag = f"unique_doc_{os.getpid()}_{int(time.time())}"
+    file_path = f"D:/TestFolder_UnitTest/{unique_tag}.txt"
     f_hash = hashlib.sha256(file_path.encode()).hexdigest()
     file_res = metadata_store.upsert_file(
         folder_id=folder_id,
         path_hash=f_hash,
         full_path=file_path,
-        filename="document.txt",
+        filename=f"{unique_tag}.txt",
         extension=".txt",
         size_bytes=1024,
         modified_at=datetime.utcnow()
@@ -58,7 +61,7 @@ def test_stored_procedures_lifecycle():
     assert stats["indexed_files"] >= 1
 
     # 6. Test sp_search_fallback_filename
-    fallback_results = metadata_store.search_fallback_filename("document", limit=5)
+    fallback_results = metadata_store.search_fallback_filename(unique_tag, limit=5)
     match_ids = [r["id"] for r in fallback_results]
     assert file_id in match_ids
 
