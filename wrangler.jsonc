@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "file-archaeologist",
+  "name": "ferret-unbury",
   "main": "worker/src/index.ts",
   "compatibility_date": "2024-10-31",
   "compatibility_flags": [
@@ -15,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "file_archaeologist_db",
-      "database_id": "file-archaeologist-db-local"
+      "database_id": "e1a6e63c-2573-4512-900b-4ee60fade4bb"
     }
   ],
   "r2_buckets": [
