@@ -620,4 +620,88 @@ export class DatabaseManager {
 
     return results.map(r => r.filename);
   }
+
+  async listDocuments(page: number = 1, pageSize: number = 24, search: string = ''): Promise<any> {
+    if (!this.db) {
+      return { items: [], total: 0, page, page_size: pageSize, total_pages: 0 };
+    }
+    const offset = (page - 1) * pageSize;
+    let where = 'workspace_id = ? AND is_deleted = 0';
+    const params: any[] = [this.workspaceId];
+    if (search.trim()) {
+      where += ' AND (filename LIKE ? OR content_preview LIKE ?)';
+      params.push(`%${search.trim()}%`, `%${search.trim()}%`);
+    }
+
+    const countRes = await this.db
+      .prepare(`SELECT COUNT(*) as total FROM files WHERE ${where}`)
+      .bind(...params)
+      .first<{ total: number }>();
+    const total = countRes?.total || 0;
+
+    const { results = [] } = await this.db
+      .prepare(`
+        SELECT id, full_path, filename, extension, size_bytes, modified_at,
+               content_preview, discovered_at, extraction_status
+        FROM files
+        WHERE ${where}
+        ORDER BY modified_at DESC
+        LIMIT ? OFFSET ?
+      `)
+      .bind(...params, pageSize, offset)
+      .all<any>();
+
+    const items = results.map(r => ({
+      id: r.id,
+      filename: r.filename,
+      full_path: r.full_path,
+      extension: r.extension || '',
+      size_bytes: r.size_bytes || 0,
+      modified_at: r.modified_at,
+      created_at: r.discovered_at,
+      discovered_at: r.discovered_at,
+      is_favorite: false,
+      category: 'General Document',
+      category_confidence: 0.9,
+      tags: [],
+      extraction_status: r.extraction_status,
+      vector_id: r.id,
+      preview: r.content_preview,
+    }));
+
+    return {
+      items,
+      total,
+      page,
+      page_size: pageSize,
+      total_pages: Math.ceil(total / pageSize),
+    };
+  }
+
+  async getRecentDocuments(limit: number = 10): Promise<any[]> {
+    if (!this.db) return [];
+    const { results = [] } = await this.db
+      .prepare(`
+        SELECT id, full_path, filename, extension, size_bytes, modified_at,
+               content_preview, discovered_at, extraction_status
+        FROM files
+        WHERE workspace_id = ? AND is_deleted = 0
+        ORDER BY modified_at DESC
+        LIMIT ?
+      `)
+      .bind(this.workspaceId, limit)
+      .all<any>();
+
+    return results.map(r => ({
+      id: r.id,
+      filename: r.filename,
+      full_path: r.full_path,
+      extension: r.extension || '',
+      size_bytes: r.size_bytes || 0,
+      modified_at: r.modified_at,
+      discovered_at: r.discovered_at,
+      preview: r.content_preview,
+      category: 'General Document',
+    }));
+  }
 }
