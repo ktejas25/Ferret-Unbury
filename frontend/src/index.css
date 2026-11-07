@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ============================================
-   1. Design Tokens (Base Layer)
+   1. Design Tokens
    ============================================ */
 @layer base {
   :root {
@@ -32,7 +32,7 @@
     --input: 216 34% 17%;
     --ring: 217 91% 60%;
 
-    /* Glass tokens (raw rgba for backdrop-filter compositing) */
+    /* Glass tokens */
     --glass-bg: rgba(15, 23, 42, 0.7);
     --glass-bg-strong: rgba(15, 23, 42, 0.6);
     --glass-bg-hover: rgba(30, 41, 59, 0.7);
@@ -48,56 +48,35 @@
   }
 
   body {
-    @apply bg-slate-950 text-slate-100 antialiased min-h-screen;
+    @apply min-h-screen bg-slate-950 text-slate-100 antialiased;
     @apply selection:bg-indigo-500/30 selection:text-indigo-200;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-    /* Prevent layout shift from scrollbar appearance */
     scrollbar-gutter: stable;
   }
 
-  /* Global focus ring — accessibility first */
   :focus-visible {
     @apply outline-none ring-2 ring-indigo-400/70 ring-offset-2 ring-offset-slate-950;
     border-radius: 6px;
   }
-
-  /* Respect motion preferences */
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
-  }
 }
 
 /* ============================================
-   2. Components — Glass Surfaces
+   2. Glass Surfaces
    ============================================ */
 @layer components {
   .glass-panel {
     background: var(--glass-bg);
-    backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
-    /* Fallback for browsers without backdrop-filter */
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-  }
-
-  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .glass-panel {
-      background: rgba(15, 23, 42, 0.95);
-    }
   }
 
   .glass-card {
     background: var(--glass-bg-strong);
-    backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
     transition:
@@ -105,7 +84,6 @@
       border-color var(--duration-base) var(--ease-out-expo),
       box-shadow var(--duration-base) var(--ease-out-expo),
       transform var(--duration-base) var(--ease-out-expo);
-    will-change: transform;
   }
 
   .glass-card:hover {
@@ -124,11 +102,13 @@
       0 0 0 3px var(--glass-ring);
   }
 
-  /* Fallback for non-glass browsers */
+  /* Solid fallback where backdrop-filter isn't supported */
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass-panel,
     .glass-card {
       background: rgba(15, 23, 42, 0.95);
     }
+
     .glass-card:hover {
       background: rgba(30, 41, 59, 0.98);
     }
@@ -151,35 +131,42 @@
   }
 
   @keyframes pulseSubtle {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: 0.5; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
   }
 
   .animate-fade-in {
-    animation: fadeIn var(--duration-slow) var(--ease-out-expo) forwards;
-    /* Start hidden so no flash of pre-animation content */
-    opacity: 0;
+    animation: fadeIn var(--duration-slow) var(--ease-out-expo) both;
   }
 
   .animate-pulse-subtle {
     animation: pulseSubtle 2.5s ease-in-out infinite;
   }
+}
 
-  /* Reduced-motion fallback: keep content visible, no animation */
-  @media (prefers-reduced-motion: reduce) {
-    .animate-fade-in {
-      animation: none;
-      opacity: 1;
-      transform: none;
-    }
-    .animate-pulse-subtle {
-      animation: none;
-    }
+/* ============================================
+   4. Reduced Motion
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-pulse-subtle {
+    animation: none;
+  }
+
+  .glass-card,
+  .glass-card:hover {
+    transition: none;
+    transform: none;
   }
 }
 
 /* ============================================
-   4. Custom Scrollbars (cross-browser)
+   5. Scrollbars
    ============================================ */
 ::-webkit-scrollbar {
   width: 6px;
@@ -193,14 +180,12 @@
 ::-webkit-scrollbar-thumb {
   background: #334155;
   border-radius: 9999px;
-  transition: background-color var(--duration-fast) ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
 
-/* Firefox */
 * {
   scrollbar-width: thin;
   scrollbar-color: #334155 transparent;
