@@ -18,12 +18,13 @@
       "database_id": "e1a6e63c-2573-4512-900b-4ee60fade4bb"
     }
   ],
-  "r2_buckets": [
-    {
-      "binding": "STORAGE_BUCKET",
-      "bucket_name": "file-archaeologist-storage"
-    }
-  ],
+  // R2 bucket can be uncommented once enabled in Cloudflare Dashboard:
+  // "r2_buckets": [
+  //   {
+  //     "binding": "STORAGE_BUCKET",
+  //     "bucket_name": "file-archaeologist-storage"
+  //   }
+  // ],
   "queues": {
     "producers": [
       {
