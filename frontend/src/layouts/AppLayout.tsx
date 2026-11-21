@@ -369,36 +369,17 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
             </div>
           </div>
 
-          {/* Right: Telemetry Badges & Quick Action Controls */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            {/* Sync Status Badge */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-400">
+          {/* Right: Telemetry / Status Pill */}
+          <div className="flex items-center shrink-0">
+            {/* Sync / Environment Mode Status Badge */}
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/90 border border-slate-800 text-[11px] font-mono text-slate-400 shadow-sm">
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
-                  syncStats?.is_connected ? 'bg-emerald-400' : 'bg-indigo-400'
+                  syncStats?.is_connected ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-indigo-400 shadow-[0_0_6px_rgba(129,140,248,0.6)]'
                 }`}
               />
               <span>{syncStats?.is_connected ? 'Cloud Synced' : 'Desktop Mode'}</span>
             </div>
-
-            {/* Quick Search Shortcut Button */}
-            <button
-              onClick={onOpenCommandPalette}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-400 hover:text-slate-200 transition"
-              title="Command Palette (Ctrl + K)"
-            >
-              <Search className="w-3.5 h-3.5 text-violet-400" />
-              <span className="font-mono text-[11px]">Ctrl K</span>
-            </button>
-
-            {/* Settings Quick Access */}
-            <button
-              onClick={onOpenSettings}
-              className="p-2 text-slate-400 hover:text-slate-200 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl transition"
-              title="System Settings"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
           </div>
         </header>
 
