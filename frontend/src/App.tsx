@@ -15,6 +15,9 @@ import { TimelinePage } from './pages/TimelinePage';
 import { StatusPage } from './pages/StatusPage';
 import { CloudSyncPage } from './pages/CloudSyncPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { AuthPage } from './pages/AuthPage';
+import { OnboardingPage } from './pages/OnboardingPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { SettingsModal } from './components/SettingsModal';
 import { DocumentPreviewModal } from './components/DocumentPreviewModal';
 import { DocumentDetailsDrawer } from './components/DocumentDetailsDrawer';
@@ -44,7 +47,12 @@ type TabId =
   | 'timeline'
   | 'status'
   | 'sync'
-  | 'analytics';
+  | 'analytics'
+  | 'login'
+  | 'signup'
+  | 'reset-password'
+  | 'onboarding'
+  | '404';
 
 const VALID_TABS: Record<string, TabId> = {
   overview: 'overview',
@@ -62,11 +70,17 @@ const VALID_TABS: Record<string, TabId> = {
   status: 'status',
   sync: 'sync',
   analytics: 'analytics',
+  login: 'login',
+  signup: 'signup',
+  'reset-password': 'reset-password',
+  onboarding: 'onboarding',
+  '404': '404',
 };
 
 const getTabFromPath = (): TabId => {
   const segment = window.location.pathname.replace(/^\//, '').toLowerCase();
-  return VALID_TABS[segment] || 'overview';
+  if (!segment) return 'overview';
+  return VALID_TABS[segment] || '404';
 };
 
 const MainApplication: React.FC = () => {
@@ -92,6 +106,13 @@ const MainApplication: React.FC = () => {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Dismiss brand splash screen once application mounts
+  useEffect(() => {
+    if (typeof (window as any).dismissBrandSplash === 'function') {
+      (window as any).dismissBrandSplash();
+    }
   }, []);
 
   // Global keyboard shortcut: Ctrl+K or Cmd+K
@@ -250,6 +271,26 @@ const MainApplication: React.FC = () => {
 
         {activeTab === 'analytics' && (
           <AnalyticsPage />
+        )}
+
+        {activeTab === 'login' && (
+          <AuthPage initialMode="login" onNavigateHome={() => setActiveTab('overview')} />
+        )}
+
+        {activeTab === 'signup' && (
+          <AuthPage initialMode="signup" onNavigateHome={() => setActiveTab('overview')} />
+        )}
+
+        {activeTab === 'reset-password' && (
+          <AuthPage initialMode="reset-password" onNavigateHome={() => setActiveTab('overview')} />
+        )}
+
+        {activeTab === 'onboarding' && (
+          <OnboardingPage onComplete={() => setActiveTab('overview')} />
+        )}
+
+        {activeTab === '404' && (
+          <NotFoundPage onNavigateHome={() => setActiveTab('overview')} />
         )}
       </AppLayout>
 

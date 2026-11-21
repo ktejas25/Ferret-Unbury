@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Logo } from '../components/Logo';
 import {
   Compass, Search, Activity, Files, Star, Bookmark, Copy,
   Sparkles, Network, GitCompare, Calendar, FolderGit2, Cloud,
@@ -131,24 +132,35 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       >
         {/* A. Fixed Branding Header */}
         <div className="shrink-0 h-[60px] flex items-center justify-between px-4 border-b border-slate-800/80 bg-slate-950/30">
-          <div className={`flex items-center gap-3 overflow-hidden ${collapsed ? 'justify-center w-full' : ''}`}>
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 via-indigo-600 to-indigo-800 flex items-center justify-center font-bold text-white shrink-0 shadow-lg shadow-violet-950/50 ring-1 ring-violet-400/30">
-              FA
-            </div>
-            {!collapsed && (
-              <div className="min-w-0 flex-1 truncate">
-                <h1 className="text-sm font-semibold text-slate-100 tracking-tight leading-tight truncate">
-                  File Archaeologist
-                </h1>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-                  <span className="text-[10px] text-violet-400 font-mono tracking-wider uppercase font-semibold">
-                    Intelligence v2.0
-                  </span>
-                </div>
+          <button
+            onClick={() => handleNavClick('overview')}
+            className={`flex items-center gap-3 overflow-hidden text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded-xl transition-opacity hover:opacity-95 ${
+              collapsed ? 'justify-center w-full' : ''
+            }`}
+            title="Ferret-Unbury"
+            aria-label="Ferret-Unbury Home"
+          >
+            {collapsed ? (
+              <Logo
+                variant="icon"
+                height={32}
+                width={32}
+                alt="Ferret-Unbury"
+                withClearSpace={false}
+                className="rounded-xl shadow-md shrink-0"
+              />
+            ) : (
+              <div className="flex items-center gap-2.5">
+                <Logo
+                  variant="compact"
+                  height={30}
+                  alt="Ferret-Unbury"
+                  withClearSpace={false}
+                  className="shrink-0"
+                />
               </div>
             )}
-          </div>
+          </button>
 
           {/* Desktop Collapse / Expand Toggle */}
           <button
@@ -339,32 +351,57 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       <div className="flex-1 flex flex-col min-w-0 h-full h-[100dvh] overflow-hidden bg-slate-950/50">
         {/* A. Sticky Header at Top */}
         <header className="shrink-0 sticky top-0 z-20 h-[56px] bg-slate-950/85 backdrop-blur-md border-b border-slate-800/80 px-4 sm:px-6 flex items-center justify-between gap-4">
-          {/* Left: Mobile Hamburger & Active Page Breadcrumb */}
+          {/* Left: Mobile Hamburger & Brand & Active Page Breadcrumb */}
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="lg:hidden p-2 text-slate-400 hover:text-slate-100 bg-slate-900 border border-slate-800 rounded-xl transition"
+              className="lg:hidden p-2 text-slate-400 hover:text-slate-100 bg-slate-900 border border-slate-800 rounded-xl transition shrink-0"
               aria-label="Toggle navigation drawer"
             >
               <Menu className="w-5 h-5" />
             </button>
 
+            {/* App Header Brand Logo (Desktop: Primary / Mono; Mobile: Compact; Linked to dashboard) */}
+            <button
+              onClick={() => handleNavClick('overview')}
+              className="flex items-center shrink-0 pr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded-lg hover:opacity-90 transition-opacity"
+              title="Ferret-Unbury Dashboard"
+              aria-label="Ferret-Unbury Dashboard"
+            >
+              <div className="hidden sm:block">
+                <Logo
+                  variant="mono"
+                  height={32}
+                  alt="Ferret-Unbury"
+                  className="text-white"
+                  withClearSpace={false}
+                />
+              </div>
+              <div className="sm:hidden">
+                <Logo
+                  variant="compact"
+                  height={28}
+                  alt="Ferret-Unbury"
+                  withClearSpace={false}
+                />
+              </div>
+            </button>
+
+            <div className="h-5 w-px bg-slate-800 hidden sm:block shrink-0" />
+
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0">
-                <currentTabMeta.icon className="w-4 h-4 text-violet-400" />
+              <div className="w-7 h-7 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0">
+                <currentTabMeta.icon className="w-3.5 h-3.5 text-violet-400" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 truncate">
-                  <span className="text-xs text-slate-500 font-mono hidden sm:inline">
+                  <span className="text-xs text-slate-500 font-mono hidden md:inline">
                     {currentTabMeta.group} /
                   </span>
-                  <h2 className="text-sm font-bold text-slate-100 tracking-tight truncate">
+                  <h2 className="text-xs sm:text-sm font-bold text-slate-100 tracking-tight truncate">
                     {currentTabMeta.label}
                   </h2>
                 </div>
-                <p className="text-[11px] text-slate-400 truncate hidden md:block">
-                  {currentTabMeta.description}
-                </p>
               </div>
             </div>
           </div>
@@ -394,10 +431,18 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         {/* C. Fixed Bottom Status Bar / Footer */}
         <footer className="shrink-0 border-t border-slate-900 bg-slate-950/95 py-2 px-4 sm:px-6 text-xs text-slate-500 font-mono z-10">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px]">
-            <div className="flex items-center gap-2 text-slate-400">
-              <span className="font-semibold text-slate-200">File Archaeologist</span>
-              <span>•</span>
-              <span className="truncate">Local-First Document Discovery & Intelligence</span>
+            <div className="flex items-center gap-2.5 text-slate-400">
+              <Logo
+                variant="mono"
+                height={24}
+                alt="Ferret-Unbury"
+                className="text-slate-300"
+                withClearSpace={false}
+              />
+              <span className="hidden sm:inline">•</span>
+              <span className="font-medium text-slate-300">
+                &copy; {new Date().getFullYear()} Ferret-Unbury. All rights reserved.
+              </span>
             </div>
 
             <div className="flex items-center gap-4 text-slate-400">

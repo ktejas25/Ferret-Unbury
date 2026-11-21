@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { DuplicateListResponse, DuplicateGroup } from '../types';
+import { BrandLoading } from '../components/BrandLoading';
 
 interface DuplicatesPageProps {
   onOpenPreview: (fileId: number) => void;
@@ -122,10 +123,12 @@ export const DuplicatesPage: React.FC<DuplicatesPageProps> = ({
       </div>
 
       {isLoading && (
-        <div className="py-20 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
-          <div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
-          <span className="text-xs">Analyzing duplicate files and vector similarities...</span>
-        </div>
+        <BrandLoading
+          message="Analyzing duplicate files and vector similarities..."
+          submessage="Comparing exact SHA-256 hashes and semantic embeddings"
+          size={56}
+          className="py-16"
+        />
       )}
 
       {!isLoading && filteredGroups.length === 0 && (

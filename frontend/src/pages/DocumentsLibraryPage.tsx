@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { DocumentItem, DocumentListResponse, TagItem, CollectionItem } from '../types';
+import { BrandLoading } from '../components/BrandLoading';
+import { BrandEmptyState } from '../components/BrandEmptyState';
 
 interface DocumentsLibraryPageProps {
   onOpenPreview: (fileId: number) => void;
@@ -293,19 +295,21 @@ export const DocumentsLibraryPage: React.FC<DocumentsLibraryPageProps> = ({
 
       {/* Loading state */}
       {isLoading && (
-        <div className="py-20 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
-          <div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
-          <span className="text-xs">Loading documents...</span>
-        </div>
+        <BrandLoading
+          message="Loading documents from index..."
+          submessage="Retrieving metadata and classification tags"
+          size={56}
+          className="py-16"
+        />
       )}
 
       {/* Empty State */}
       {!isLoading && documents.length === 0 && (
-        <div className="py-20 text-center text-slate-500 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col items-center justify-center gap-2">
-          <Files className="w-10 h-10 text-slate-600 mb-1" />
-          <span className="text-sm font-medium text-slate-300">No documents found</span>
-          <span className="text-xs text-slate-500">Try adjusting your filters, search terms, or add monitored folders.</span>
-        </div>
+        <BrandEmptyState
+          title="No documents found"
+          message="Try adjusting your filters, searching for a different keyword, or configuring monitored directory folders in Index &amp; Folders."
+          className="py-16 bg-slate-900/30 border border-slate-800/60 rounded-2xl"
+        />
       )}
 
       {/* GRID VIEW */}

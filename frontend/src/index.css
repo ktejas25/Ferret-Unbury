@@ -7,6 +7,11 @@
    ============================================ */
 @layer base {
   :root {
+    /* Ferret-Unbury Brand Tokens */
+    --brand-navy: #0B1F3A;
+    --brand-blue: #007AFF;
+    --brand-white: #FFFFFF;
+
     /* Surface & text */
     --background: 222 47% 11%;
     --foreground: 210 40% 98%;

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Logo } from './Logo';
 import {
   Search,
   FolderTree,
@@ -40,24 +41,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="flex items-center space-x-3 cursor-pointer group select-none"
           onClick={() => setActiveTab('search')}
         >
-          <div className="relative">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 group-hover:shadow-indigo-500/40 group-hover:scale-105 transition-all duration-200">
-              <Compass className="w-5 h-5 text-white transition-transform group-hover:rotate-45 duration-300" />
-            </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-slate-950" />
+          <div className="hidden sm:block">
+            <Logo
+              variant="mono"
+              height={32}
+              alt="Ferret-Unbury"
+              className="text-white hover:opacity-95 transition-opacity"
+              withClearSpace={false}
+            />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-base font-bold tracking-tight text-white group-hover:text-indigo-200 transition-colors">
-                File Archaeologist
-              </span>
-              <span className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold">
-                PRO
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400 hidden sm:flex items-center gap-1 font-mono">
-              <span>Local-First Semantic Discovery</span>
-            </p>
+          <div className="sm:hidden">
+            <Logo
+              variant="compact"
+              height={28}
+              alt="Ferret-Unbury"
+              withClearSpace={false}
+            />
           </div>
         </div>
 

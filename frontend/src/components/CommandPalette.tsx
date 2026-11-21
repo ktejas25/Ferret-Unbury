@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Logo } from './Logo';
 import { Search, FileText, ArrowRight, Star, Folder, Sparkles, X, CornerDownLeft } from 'lucide-react';
 import { api } from '../api/client';
 import { SearchResultItem } from '../types';
@@ -171,7 +172,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             <span>↑↓ Navigate</span>
             <span>↵ Select</span>
           </div>
-          <span>File Archaeologist Quick Search</span>
+          <div className="flex items-center gap-2">
+            <Logo
+              variant="icon"
+              height={14}
+              width={14}
+              alt="Ferret-Unbury"
+              withClearSpace={false}
+              className="rounded-sm"
+            />
+            <span>Ferret-Unbury Quick Search</span>
+          </div>
         </div>
       </div>
     </div>

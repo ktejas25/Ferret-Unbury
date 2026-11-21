@@ -43,6 +43,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { api } from '../api/client';
+import { Logo } from '../components/Logo';
+import { BrandLoading } from '../components/BrandLoading';
 import { SearchResultItem, SearchResponse } from '../types';
 
 /* ────────────────────────────────────────────────
@@ -515,7 +517,7 @@ const NoFoldersBanner = ({ onNavigate }: NoFoldersBannerProps) => (
         <p className="text-sm font-semibold text-slate-100">No monitored folders yet</p>
         <p className="mt-1 max-w-xl leading-relaxed text-slate-400">
           Add at least one folder, such as Documents, Projects, or Pictures, so
-          File Archaeologist can index and search your files.
+          Ferret-Unbury can index and search your files.
         </p>
       </div>
     </div>
@@ -593,18 +595,25 @@ const EmptyState = ({
   onExampleSelect: (text: string) => void;
 }) => (
   <div className="animate-fade-in px-4 py-16 text-center motion-reduce:animate-none">
-    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-indigo-500/30 bg-gradient-to-tr from-indigo-500/20 via-violet-500/10 to-transparent text-indigo-400 shadow-xl shadow-indigo-500/10">
-      <Compass className="h-8 w-8" aria-hidden />
+    <div className="mx-auto mb-5 flex justify-center opacity-40 grayscale contrast-125 hover:opacity-60 transition-opacity">
+      <Logo
+        variant="icon"
+        height={96}
+        width={96}
+        alt="Ferret-Unbury empty state"
+        withClearSpace={false}
+        className="rounded-3xl shadow-xl"
+      />
     </div>
 
     <h2 className="text-lg font-bold text-slate-100 sm:text-xl">
-      {hasSearched ? 'No matching files' : 'Ready to find your files'}
+      {hasSearched ? 'No matching files found' : 'Ready to unbury your files'}
     </h2>
 
     <p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-slate-400 sm:text-sm">
       {hasSearched
-        ? 'Try different keywords, a broader phrase, or a different file type filter.'
-        : 'Search using natural language, topics, or key phrases. Semantic matching finds files even when the exact words differ.'}
+        ? 'No files matched your criteria. Try different keywords, a broader phrase, or clear active filters.'
+        : 'Search using natural language, topics, or key phrases. Ferret-Unbury finds files even when the exact words differ.'}
     </p>
 
     {!hasSearched && (
@@ -879,7 +888,16 @@ export const SearchPage: React.FC<SearchPageProps> = ({
           <form onSubmit={handleSubmit} className="relative flex items-center" role="search">
             <div className="pointer-events-none absolute left-4 flex items-center text-slate-400 transition-colors group-focus-within:text-indigo-400">
               {isLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin text-indigo-400 motion-reduce:animate-none" aria-hidden />
+                <div className="h-5 w-5 animate-pulse flex items-center justify-center">
+                  <Logo
+                    variant="icon"
+                    height={20}
+                    width={20}
+                    alt="Loading"
+                    withClearSpace={false}
+                    className="rounded-md"
+                  />
+                </div>
               ) : (
                 <Search className="h-5 w-5" aria-hidden />
               )}
@@ -1067,7 +1085,15 @@ export const SearchPage: React.FC<SearchPageProps> = ({
 
       {error && <ErrorBanner message={error} onRetry={lastSearch ? retrySearch : undefined} />}
 
-      {isLoading && <SkeletonList grid={viewMode === 'grid'} />}
+      {isLoading && (
+        <div className="py-12">
+          <BrandLoading
+            message="Unburying matching files..."
+            submessage="Searching semantic embeddings and local filesystem index"
+            size={56}
+          />
+        </div>
+      )}
 
       {!isLoading && sortedResults.length > 0 && (
         <>

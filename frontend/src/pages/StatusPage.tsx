@@ -23,6 +23,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { api } from '../api/client';
+import { Logo } from '../components/Logo';
 import { IndexStatus, FolderItem } from '../types';
 
 /* ────────────────────────────────────────────────
@@ -504,7 +505,16 @@ export const StatusPage: React.FC<StatusPageProps> = ({
         >
           <div className="mb-2.5 flex items-center justify-between text-xs font-medium text-indigo-200 sm:text-sm">
             <span className="flex items-center gap-2">
-              <RefreshCw className="h-4 w-4 animate-spin text-indigo-400" aria-hidden />
+              <div className="w-4 h-4 animate-pulse flex items-center justify-center shrink-0">
+                <Logo
+                  variant="icon"
+                  height={16}
+                  width={16}
+                  alt="Indexing"
+                  withClearSpace={false}
+                  className="rounded-sm"
+                />
+              </div>
               <span>Active task: {status.current_task || 'Indexing queued files'}</span>
             </span>
             <span className="font-mono font-semibold text-indigo-300">
@@ -565,7 +575,7 @@ export const StatusPage: React.FC<StatusPageProps> = ({
           <span>Add monitored folder</span>
         </h2>
         <p className="mb-4 max-w-xl text-xs leading-relaxed text-slate-400">
-          Enter any folder path on your computer. File Archaeologist will scan it
+          Enter any folder path on your computer. Ferret-Unbury will scan it
           recursively, watch for changes, and extract text and OCR content for search.
         </p>
 

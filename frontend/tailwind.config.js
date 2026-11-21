@@ -8,6 +8,11 @@ export default {
   theme: {
     extend: {
       colors: {
+        brand: {
+          navy: "var(--brand-navy)",
+          blue: "var(--brand-blue)",
+          white: "var(--brand-white)",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
