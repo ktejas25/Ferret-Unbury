@@ -11,9 +11,9 @@ from typing import Dict, List, Optional, Tuple, Any
 
 import httpx
 
-from backend.app.config import settings
-from backend.app.core.security import validate_safe_folder_path, validate_path_within_roots
-from backend.app.models.sync import (
+from app.config import settings
+from app.core.security import validate_safe_folder_path, validate_path_within_roots
+from app.models.sync import (
     SyncStatus,
     SyncSettings,
     SyncItem,

@@ -1,9 +1,9 @@
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from backend.app.core.security import verify_api_authorization
-from backend.app.core.sync_service import sync_service
-from backend.app.models.sync import (
+from app.core.security import verify_api_authorization
+from app.core.sync_service import sync_service
+from app.models.sync import (
     SyncConnectRequest,
     SyncFolderRequest,
     SyncSettingsUpdate,

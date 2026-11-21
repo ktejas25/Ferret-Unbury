@@ -3,8 +3,8 @@ import gc
 import tempfile
 import pytest
 from unittest.mock import patch, MagicMock
-from backend.app.core.sync_service import SyncService, compute_file_sha256
-from backend.app.models.sync import SyncStatus
+from app.core.sync_service import SyncService, compute_file_sha256
+from app.models.sync import SyncStatus
 
 
 @pytest.fixture

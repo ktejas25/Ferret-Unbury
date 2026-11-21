@@ -10,8 +10,10 @@ import webbrowser
 import logging
 from pathlib import Path
 
-# Add backend directory to path
-backend_dir = Path(__file__).resolve().parent.parent / "backend"
+# Add backend directory and project root to path
+project_root = Path(__file__).resolve().parent.parent
+backend_dir = project_root / "backend"
+sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(backend_dir))
 
 import uvicorn
